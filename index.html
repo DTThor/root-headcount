@@ -2136,15 +2136,119 @@ function maybeOfferBackfill(event) {
 
 function openAddPersonModal(defaults = {}) {
   const newId = 'p_' + Date.now();
+  // Draft lives only in memory — not pushed to state until Save is clicked
   const person = {
-    id: newId, first: 'New', last: 'Person',
+    id: newId, first: '', last: '',
     role: defaults.role || 'FA',
     team: defaults.team || (currentTab !== 'overview' ? currentTab : 'Banyan'),
     dept: 'Advisory', status: 'active', criteria: {}, aum: null,
     supportsIds: defaults.supportsIds || []
   };
-  state.people.push(person);
-  openPersonModal(newId);
+
+  const modalRoot = document.getElementById('modal-root');
+  const overlay = document.createElement('div');
+  overlay.className = 'overlay';
+
+  const modal = document.createElement('div');
+  modal.className = 'modal';
+
+  const header = document.createElement('div');
+  header.className = 'modal-hdr';
+  const title = document.createElement('h3');
+  title.textContent = 'Add Person';
+  header.appendChild(title);
+  const closeBtn = document.createElement('button');
+  closeBtn.className = 'modal-close';
+  closeBtn.textContent = '×';
+  closeBtn.onclick = () => { modalRoot.innerHTML = ''; modalRoot.style.display = 'none'; };
+  header.appendChild(closeBtn);
+  modal.appendChild(header);
+
+  const body = document.createElement('div');
+  body.className = 'modal-body';
+
+  // Name
+  const frow = document.createElement('div');
+  frow.className = 'frow';
+  const fg1 = document.createElement('div'); fg1.className = 'fg';
+  const l1 = document.createElement('label'); l1.className = 'fl'; l1.textContent = 'First Name';
+  const fi1 = document.createElement('input'); fi1.className = 'fi'; fi1.type = 'text'; fi1.value = person.first; fi1.placeholder = 'First';
+  fi1.oninput = (e) => { person.first = e.target.value; title.textContent = (person.first + ' ' + person.last).trim() || 'Add Person'; };
+  fg1.appendChild(l1); fg1.appendChild(fi1); frow.appendChild(fg1);
+
+  const fg2 = document.createElement('div'); fg2.className = 'fg';
+  const l2 = document.createElement('label'); l2.className = 'fl'; l2.textContent = 'Last Name';
+  const fi2 = document.createElement('input'); fi2.className = 'fi'; fi2.type = 'text'; fi2.value = person.last; fi2.placeholder = 'Last';
+  fi2.oninput = (e) => { person.last = e.target.value; title.textContent = (person.first + ' ' + person.last).trim() || 'Add Person'; };
+  fg2.appendChild(l2); fg2.appendChild(fi2); frow.appendChild(fg2);
+  body.appendChild(frow);
+
+  // Role
+  const fg3 = document.createElement('div'); fg3.className = 'fg';
+  const l3 = document.createElement('label'); l3.className = 'fl'; l3.textContent = 'Role';
+  const fs3 = document.createElement('select'); fs3.className = 'fs';
+  ROLES.forEach(r => { const opt = document.createElement('option'); opt.value = r; opt.textContent = ROLE_LABELS[r] || r; fs3.appendChild(opt); });
+  fs3.value = person.role;
+  fs3.onchange = (e) => { person.role = e.target.value; };
+  fg3.appendChild(l3); fg3.appendChild(fs3); body.appendChild(fg3);
+
+  // Team
+  const fg4 = document.createElement('div'); fg4.className = 'fg';
+  const l4 = document.createElement('label'); l4.className = 'fl'; l4.textContent = 'Team';
+  const fs4 = document.createElement('select'); fs4.className = 'fs';
+  Object.keys(TEAMS).forEach(t => { const opt = document.createElement('option'); opt.value = t; opt.textContent = t; fs4.appendChild(opt); });
+  fs4.value = person.team;
+  fs4.onchange = (e) => { person.team = e.target.value; buildPersonSupportsUI(person, supportsContainer); };
+  fg4.appendChild(l4); fg4.appendChild(fs4); body.appendChild(fg4);
+
+  // Status
+  const fg5 = document.createElement('div'); fg5.className = 'fg';
+  const l5 = document.createElement('label'); l5.className = 'fl'; l5.textContent = 'Status';
+  const fs5 = document.createElement('select'); fs5.className = 'fs';
+  [['active','Active'],['leave','On Leave'],['backfill','Open Backfill']].forEach(([v,t]) => { const opt = document.createElement('option'); opt.value = v; opt.textContent = t; fs5.appendChild(opt); });
+  fs5.value = person.status;
+  fs5.onchange = (e) => { person.status = e.target.value; };
+  fg5.appendChild(l5); fg5.appendChild(fs5); body.appendChild(fg5);
+
+  // Supports
+  const supportsContainer = document.createElement('div');
+  if (!['SA','LFA','FA'].includes(person.role)) {
+    buildPersonSupportsUI(person, supportsContainer);
+  }
+  body.appendChild(supportsContainer);
+
+  modal.appendChild(body);
+
+  const footer = document.createElement('div');
+  footer.className = 'modal-footer';
+  const cancelBtn = document.createElement('button');
+  cancelBtn.className = 'btn-ghost';
+  cancelBtn.textContent = 'Cancel';
+  cancelBtn.onclick = () => { modalRoot.innerHTML = ''; modalRoot.style.display = 'none'; };
+  const saveBtn = document.createElement('button');
+  saveBtn.className = 'btn-primary';
+  saveBtn.textContent = 'Add Person';
+  saveBtn.onclick = () => {
+    if (!person.first.trim() && !person.last.trim()) {
+      alert('Please enter a name.');
+      return;
+    }
+    state.people.push(person);
+    saveState();
+    render();
+    modalRoot.innerHTML = '';
+    modalRoot.style.display = 'none';
+  };
+  footer.appendChild(cancelBtn);
+  footer.appendChild(saveBtn);
+  modal.appendChild(footer);
+
+  overlay.appendChild(modal);
+  overlay.onclick = (e) => { if (e.target === overlay) { modalRoot.innerHTML = ''; modalRoot.style.display = 'none'; } };
+  modalRoot.innerHTML = '';
+  modalRoot.appendChild(overlay);
+  modalRoot.style.display = 'block';
+  fi1.focus();
 }
 
 // Builds (or rebuilds) the "Supports" checkbox section inside the person modal.
