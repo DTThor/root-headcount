@@ -279,19 +279,20 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
   .changes-panel.mob-open { display: flex; }
   .overview-grid { grid-template-columns: 1fr 1fr; gap: 10px; }
   .stat-card { padding: 12px; }
-  .sv-cs-group-pods {
-    flex-wrap: nowrap;
+  .sv-cs-group-pods { flex-wrap: nowrap; gap: 8px; }
+  .sv-pod { min-width: 100px; flex-shrink: 0; }
+  .person-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
+
+  /* Horizontal scroll wrapper for the full team grid */
+  .mob-grid-scroll {
     overflow-x: auto;
+    overflow-y: visible;
     -webkit-overflow-scrolling: touch;
     scrollbar-width: none;
-    padding-bottom: 4px;
-    gap: 8px;
+    width: 100%;
   }
-  .sv-cs-group-pods::-webkit-scrollbar { display: none; }
-  .sv-cs-group { overflow: visible; }
-  .sv-pod { min-width: 100px; flex-shrink: 0; }
-  .sv-no-cs-group .sv-cs-group-pods { flex-wrap: nowrap; }
-  .person-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
+  .mob-grid-scroll::-webkit-scrollbar { display: none; }
+  .mob-grid-scroll > * { min-width: max-content; }
 
   /* Mobile bottom nav */
   .mobile-nav {
@@ -816,18 +817,25 @@ function render() {
     renderPodView(content, team, teamPeople, allPeople);
   }
 
-  // On mobile teams tab, inject team selector bar at top of content
+  // On mobile teams tab: team selector bar + horizontally scrollable grid wrapper
   if (window.innerWidth <= 768 && mobileActiveTab === 'teams') {
+    // Wrap all existing content in a horizontal scroll container
+    const scrollWrap = document.createElement('div');
+    scrollWrap.className = 'mob-grid-scroll';
+    while (content.firstChild) scrollWrap.appendChild(content.firstChild);
+    content.appendChild(scrollWrap);
+
+    // Inject team bar ABOVE the scroll wrapper
     const bar = document.createElement('div');
     bar.className = 'mobile-team-bar';
-    Object.keys(TEAMS).forEach(team => {
+    Object.keys(TEAMS).forEach(t => {
       const chip = document.createElement('button');
-      chip.className = 'mob-team-chip' + (currentTab === team ? ' active' : '');
-      chip.textContent = team;
-      chip.onclick = () => setTab(team);
+      chip.className = 'mob-team-chip' + (currentTab === t ? ' active' : '');
+      chip.textContent = t;
+      chip.onclick = () => setTab(t);
       bar.appendChild(chip);
     });
-    content.insertBefore(bar, content.firstChild);
+    content.insertBefore(bar, scrollWrap);
   }
 }
 
