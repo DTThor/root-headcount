@@ -279,8 +279,18 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
   .changes-panel.mob-open { display: flex; }
   .overview-grid { grid-template-columns: 1fr 1fr; gap: 10px; }
   .stat-card { padding: 12px; }
-  .sv-cs-group-pods { gap: 8px; }
-  .sv-pod { min-width: 90px; }
+  .sv-cs-group-pods {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    padding-bottom: 4px;
+    gap: 8px;
+  }
+  .sv-cs-group-pods::-webkit-scrollbar { display: none; }
+  .sv-cs-group { overflow: visible; }
+  .sv-pod { min-width: 100px; flex-shrink: 0; }
+  .sv-no-cs-group .sv-cs-group-pods { flex-wrap: nowrap; }
   .person-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
 
   /* Mobile bottom nav */
