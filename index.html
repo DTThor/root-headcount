@@ -955,6 +955,33 @@ function avatarEl(p, size, bg, textColor, initials, hasPromo) {
   return wrap;
 }
 
+function criteriaBarEl(p) {
+  let criteriaKey = null;
+  if (p.role === 'AFA2' || p.role === 'AFA1') criteriaKey = 'AFA2→FA';
+  else if (p.role === 'FA') criteriaKey = 'FA→LFA';
+  if (!criteriaKey) return null;
+  const crits = PROMO_CRITERIA[criteriaKey];
+  if (!crits || !crits.length) return null;
+  const checked = crits.filter(c => p.criteria && p.criteria[c.key]).length;
+  if (checked === 0) return null;
+  const total = crits.length;
+  const pct = Math.round((checked / total) * 100);
+  const done = checked === total;
+  const wrap = document.createElement('div');
+  wrap.style.cssText = 'margin-top:4px;width:100%';
+  const lbl = document.createElement('div');
+  lbl.style.cssText = `font-size:8px;font-weight:600;letter-spacing:0.3px;margin-bottom:2px;color:${done ? '#28a745' : 'var(--text-muted)'}`;
+  lbl.textContent = (done ? '✓ ' : '') + checked + '/' + total + ' criteria';
+  wrap.appendChild(lbl);
+  const track = document.createElement('div');
+  track.style.cssText = 'height:3px;background:var(--border);border-radius:2px;overflow:hidden;width:100%';
+  const fill = document.createElement('div');
+  fill.style.cssText = `height:100%;width:${pct}%;border-radius:2px;background:${done ? '#28a745' : '#9F5E35'};transition:width 0.3s`;
+  track.appendChild(fill);
+  wrap.appendChild(track);
+  return wrap;
+}
+
 function aumBarEl(p) {
   if (!['LFA','FA'].includes(p.role) || p.aum === null) return null;
   const threshold = AUM_THRESHOLDS[p.role];
@@ -1023,6 +1050,8 @@ function personChip(p, size) {
   }
   const bar = aumBarEl(p);
   if (bar) chip.appendChild(bar);
+  const critBar = criteriaBarEl(p);
+  if (critBar) chip.appendChild(critBar);
   return chip;
 }
 
