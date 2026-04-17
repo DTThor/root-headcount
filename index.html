@@ -2195,19 +2195,23 @@ function buildEventSupportsUI(event, containerEl) {
   const supportList = document.createElement('div');
   supportList.style.fontSize = '12px';
 
-  const isCS = event.toRole === 'CSA' || event.toRole === 'CSC';
-  // For AFA roles filter to selected team; CS can span teams so show all
-  let advisors = state.people.filter(p => ['SA', 'LFA', 'FA'].includes(p.role));
-  if (!isCS && event.toTeam) {
-    advisors = advisors.filter(p => p.team === event.toTeam);
+  if (!event.toTeam) {
+    const warn = document.createElement('div');
+    warn.style.cssText = 'color:var(--warning-text);background:var(--warning-bg);border-radius:6px;padding:7px 10px;font-size:12px;';
+    warn.textContent = 'Select a team above to see support options.';
+    supportList.appendChild(warn);
+    containerEl.appendChild(supportList);
+    return;
   }
+
+  const advisors = state.people.filter(p =>
+    ['SA', 'LFA', 'FA'].includes(p.role) && p.team === event.toTeam
+  );
 
   if (advisors.length === 0) {
     const empty = document.createElement('div');
     empty.style.cssText = 'color:#999;font-size:12px;font-style:italic;padding:4px 0';
-    empty.textContent = (!isCS && !event.toTeam)
-      ? 'Select a team above to see pod leaders.'
-      : 'No pod leaders found for this team.';
+    empty.textContent = 'No SA / LFA / FA found on this team.';
     supportList.appendChild(empty);
   } else {
     advisors.forEach(ad => {
