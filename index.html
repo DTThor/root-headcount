@@ -44,7 +44,8 @@ body { font-family: 'Sailec', -apple-system, BlinkMacSystemFont, sans-serif; bac
 
 /* TOPBAR */
 .topbar { background: #33342C; color: white; padding: 0 16px; display: flex; align-items: center; gap: 12px; height: 48px; flex-shrink: 0; }
-.topbar-title h1 { font-size: 14px; font-weight: 700; white-space: nowrap; }
+.topbar-title { align-items: flex-start !important; padding-top: 14px; }
+.topbar-title h1 { font-size: 14px; font-weight: 700; white-space: nowrap; font-family: 'Sailec', sans-serif; }
 .topbar-title p { font-size: 10px; opacity: 0.6; }
 .search-wrap { position: relative; flex: 1; max-width: 220px; }
 .search-input { width: 100%; box-sizing: border-box; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.18); border-radius: 8px; padding: 6px 12px 6px 32px; color: white; font-size: 13px; outline: none; transition: background 0.15s, border-color 0.15s; }
@@ -59,12 +60,12 @@ body { font-family: 'Sailec', -apple-system, BlinkMacSystemFont, sans-serif; bac
 .search-result-meta { font-size: 11px; color: var(--text-muted); margin-top: 1px; }
 .search-no-results { padding: 14px; font-size: 12px; color: var(--text-muted); text-align: center; }
 .view-toggle { display: flex; background: rgba(255,255,255,0.12); border-radius: 6px; padding: 2px; margin-left: auto; }
-.view-toggle button { background: none; border: none; color: rgba(255,255,255,0.7); padding: 4px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: 500; transition: all 0.15s; }
+.view-toggle button { background: none; border: none; color: rgba(255,255,255,0.7); padding: 4px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: 500; transition: all 0.15s; font-family: 'Sailec', sans-serif; }
 .view-toggle button.active { background: rgba(255,255,255,0.2); color: white; }
 .proj-wrap { display: none; align-items: center; gap: 6px; color: rgba(255,255,255,0.7); font-size: 12px; }
 .proj-wrap.visible { display: flex; }
 .proj-wrap input { background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.2); color: white; border-radius: 4px; padding: 3px 7px; font-size: 12px; }
-.btn-top { background: #9F5E35; color: white; border: none; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: 500; white-space: nowrap; transition: background 0.15s; }
+.btn-top { background: #9F5E35; color: white; border: none; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: 500; white-space: nowrap; transition: background 0.15s; font-family: 'Sailec', sans-serif; }
 .btn-top:hover { background: #8A5030; }
 .btn-top.secondary { background: #33342C; border: 1px solid rgba(255,255,255,0.25); }
 .btn-top.secondary:hover { background: #4A4B40; }
@@ -96,9 +97,9 @@ body { font-family: 'Sailec', -apple-system, BlinkMacSystemFont, sans-serif; bac
 .ov-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; cursor: pointer; transition: box-shadow 0.15s, transform 0.12s; display: flex; flex-direction: column; }
 .ov-card:hover { box-shadow: 0 4px 18px rgba(0,0,0,0.11); transform: translateY(-2px); }
 .ov-card-header { padding: 13px 16px 11px; display: flex; align-items: center; gap: 8px; }
-.ov-card-name { font-size: 15px; font-weight: 700; color: var(--text); flex: 1; letter-spacing: -0.2px; }
-.ov-card-tz { font-size: 10px; font-weight: 600; color: var(--text-muted); background: var(--surface2); padding: 2px 7px; border-radius: 8px; border: 1px solid var(--border); letter-spacing: 0.2px; }
-.ov-card-count { font-size: 13px; font-weight: 700; color: var(--text-muted); min-width: 16px; text-align: right; }
+.ov-card-name { font-size: 15px; font-weight: 700; color: var(--text); letter-spacing: -0.2px; }
+.ov-card-tz { font-size: 10px; font-weight: 600; color: var(--text-muted); background: var(--surface2); padding: 0 7px; border-radius: 8px; border: 1px solid var(--border); letter-spacing: 0.2px; display: inline-flex; align-items: center; justify-content: center; height: 18px; }
+.ov-card-count { font-size: 13px; font-weight: 700; color: var(--text-muted); min-width: 16px; text-align: right; margin-left: auto; }
 .ov-card-stats { display: flex; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
 .ov-stat-pill { flex: 1; text-align: center; padding: 8px 6px; border-right: 1px solid var(--border); }
 .ov-stat-pill:last-child { border-right: none; }
@@ -361,7 +362,7 @@ body { font-family: 'Sailec', -apple-system, BlinkMacSystemFont, sans-serif; bac
 <div class="app">
 <div class="topbar">
   <div class="topbar-title" onclick="setTab('overview')" style="cursor:pointer;display:flex;align-items:center;gap:10px;text-decoration:none">
-    <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAC0AAAAcCAYAAAD1PDaSAAAFKklEQVR42tXYS2wbVRQG4P9cn3H6SO0Z54lEtyRGCCSWrJoNG3YsvCji0VJSAQKpUkVDE5I+1EJBRUgF1FJAIGCTLJG6Q96yQgiq1jbbFpr4MXbSvObeO4eF7cRJ7DxMqlJL3ow0vt+cOefcc03BdGZZKYqKCP7vHyJCGEqgHhUwAIgIlKKoelTAjXAWEdv+2yL1H9a37QaMZOmuoJ2bRWDuz7ct5gOd7YYKrCtzPyuFPRBIKEJb3wRSIAklZBXhIQnDthbWs3O/ABAQAMGWUVNEAgKFIZao3UjpfPbTyN49J8z8QriTNBGRkPfvU3Zh4ZLTmxxpZ20lMhkREbXVN51Os4g4AKALuWvc5W0AS4skbbxORMrML4Tc3XVK5zNXAEBu3oyKyLYcIpMR2mZ0CJhSRCmr85lrnPCGdcE3ROB6fgsgTkeUTKA35m/UgV4OhIhW1hPAOAmPjV+54vQ88a6IRACERLR1quwQ/BV73rAp+roOFhFAqdBxHNLLwR1SqmaqRVYR9HJwx+mIEoBwtTTAuugb9uLv6Jns50Rkq29+67pSW4KnauBC7jonvDdMydcAnBUwkeHuLmWtPalUZCTixiACW49mJBZDCJzQQTDGPd1KAFN/JCKwLpYMJ9y3dSH7xXbhavMIgyiVsjqf/Ybd+DFTXAMWIjKO57LJ5y9xz8Dl0NrOZu2TQXujvckLppD/zEl4LARTT3MiYlPyNbvuW7qQ/bIKn9oUrjYFE4W6mP2WPffouggLkbLsuWzKlfNOb3JERBQijYmx2s8BIhFRTk/yhCn5nzgJl0FkGurTqcHf1DO5q0SpTeFqU3A+8x277pHm4Dibkn/O6RkYF8l1EFHYhLzyq0QUSi7X4fQOvmdKlUst4Yn4cV3IXdsMrlqDc9+z5726ISVUFWz98hmnLzkhkmZgdns7zOxsKOk0O70DI6bkf9Q64vFhnc9eJ0pZTG2Eq2bgoJD9gb34KxsirJRlN8baL09w7+DZKnjIAnPbmwPm5gSHDtkqPPm+8csXHa8F3HOP6Xz2a0ql7NQ6OG+IcCH7I7vuS03B8RjrYmU82j94XiTNoCFLtSaygylLRMSKpJlocFRPZ8RJuKPGLxsRidR6eS1VvNeDfFZFewaO1jYXEJFwtQmQABBd+OsndmOHTdHXoCbgcnks2p+80AhuczxshI/pfDZkz/3A+BUjEq6BOwnviM7niIiO1APMAEjytzsN8VV2Y4dNqSV4NNqbvCgiTERmF04hDfCBcT19Wzjhja+H62LJOJ77mi5kHdaLxwEsKiIKDXCIu/oPm5K/XJ8v1qaEf3o3wY1wYMiKpNnpS06Ykn+WvTiTUlaquVCdAxcXQaAXFwx5AERNTk5GuPvPG2bm7gVOuB1EZCQMa+ADrP3KSPSxJz/cbXDDlNoIP6P98gS7sSrchsbZtydiBQW7FDy3/+AzdwAQp1IpKyLk9NGYns4QJ+KndXnOcKyTtT97Kto3+PGDAjfCpQYnGjwX3MuI4x44B21grS3Y+4vPdzz+1O8yORkhIsurLa+hmt3EqPaLJ6P9ycsPGtwwQInQCvx8cO+WisTix2y58kLHwaf/qF4fMht2womJCQUAyzO3nq1d29ZwX+3XQJC/PSzBPxJMZ7SeyUgwk9Gy/LeY6czLACDpNG9zFFYAUPj1RqyZg9cWRX0Oot9ERNW25ofx/0ZYc8w2c6gWreihgdc5qJlDtXrS9lOzRam13RLbOLns6MBJahEiq3QRQhgCJEu7uc6/zmvaCSwl2iIAAAAASUVORK5CYII=" style="height:28px;width:auto;flex-shrink:0" alt="Root logo">
+    <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAC0AAAAcCAYAAAD1PDaSAAAFKklEQVR42tXYS2wbVRQG4P9cn3H6SO0Z54lEtyRGCCSWrJoNG3YsvCji0VJSAQKpUkVDE5I+1EJBRUgF1FJAIGCTLJG6Q96yQgiq1jbbFpr4MXbSvObeO4eF7cRJ7DxMqlJL3ow0vt+cOefcc03BdGZZKYqKCP7vHyJCGEqgHhUwAIgIlKKoelTAjXAWEdv+2yL1H9a37QaMZOmuoJ2bRWDuz7ct5gOd7YYKrCtzPyuFPRBIKEJb3wRSIAklZBXhIQnDthbWs3O/ABAQAMGWUVNEAgKFIZao3UjpfPbTyN49J8z8QriTNBGRkPfvU3Zh4ZLTmxxpZ20lMhkREbXVN51Os4g4AKALuWvc5W0AS4skbbxORMrML4Tc3XVK5zNXAEBu3oyKyLYcIpMR2mZ0CJhSRCmr85lrnPCGdcE3ROB6fgsgTkeUTKA35m/UgV4OhIhW1hPAOAmPjV+54vQ88a6IRACERLR1quwQ/BV73rAp+roOFhFAqdBxHNLLwR1SqmaqRVYR9HJwx+mIEoBwtTTAuugb9uLv6Jns50Rkq29+67pSW4KnauBC7jonvDdMydcAnBUwkeHuLmWtPalUZCTixiACW49mJBZDCJzQQTDGPd1KAFN/JCKwLpYMJ9y3dSH7xXbhavMIgyiVsjqf/Ybd+DFTXAMWIjKO57LJ5y9xz8Dl0NrOZu2TQXujvckLppD/zEl4LARTT3MiYlPyNbvuW7qQ/bIKn9oUrjYFE4W6mP2WPffouggLkbLsuWzKlfNOb3JERBQijYmx2s8BIhFRTk/yhCn5nzgJl0FkGurTqcHf1DO5q0SpTeFqU3A+8x277pHm4Dibkn/O6RkYF8l1EFHYhLzyq0QUSi7X4fQOvmdKlUst4Yn4cV3IXdsMrlqDc9+z5726ISVUFWz98hmnLzkhkmZgdns7zOxsKOk0O70DI6bkf9Q64vFhnc9eJ0pZTG2Eq2bgoJD9gb34KxsirJRlN8baL09w7+DZKnjIAnPbmwPm5gSHDtkqPPm+8csXHa8F3HOP6Xz2a0ql7NQ6OG+IcCH7I7vuS03B8RjrYmU82j94XiTNoCFLtSaygylLRMSKpJlocFRPZ8RJuKPGLxsRidR6eS1VvNeDfFZFewaO1jYXEJFwtQmQABBd+OsndmOHTdHXoCbgcnks2p+80AhuczxshI/pfDZkz/3A+BUjEq6BOwnviM7niIiO1APMAEjytzsN8VV2Y4dNqSV4NNqbvCgiTERmF04hDfCBcT19Wzjhja+H62LJOJ77mi5kHdaLxwEsKiIKDXCIu/oPm5K/XJ8v1qaEf3o3wY1wYMiKpNnpS06Ykn+WvTiTUlaquVCdAxcXQaAXFwx5AERNTk5GuPvPG2bm7gVOuB1EZCQMa+ADrP3KSPSxJz/cbXDDlNoIP6P98gS7sSrchsbZtydiBQW7FDy3/+AzdwAQp1IpKyLk9NGYns4QJ+KndXnOcKyTtT97Kto3+PGDAjfCpQYnGjwX3MuI4x44B21grS3Y+4vPdzz+1O8yORkhIsurLa+hmt3EqPaLJ6P9ycsPGtwwQInQCvx8cO+WisTix2y58kLHwaf/qF4fMht2womJCQUAyzO3nq1d29ZwX+3XQJC/PSzBPxJMZ7SeyUgwk9Gy/LeY6czLACDpNG9zFFYAUPj1RqyZg9cWRX0Oot9ERNW25ofx/0ZYc8w2c6gWreihgdc5qJlDtXrS9lOzRam13RLbOLns6MBJahEiq3QRQhgCJEu7uc6/zmvaCSwl2iIAAAAASUVORK5CYII=" style="height:20px;width:auto;flex-shrink:0" alt="Root logo">
     <h1>Advisory Headcount</h1>
   </div>
   <div class="search-wrap">
@@ -1081,7 +1082,7 @@ function renderOverview(el, allPeople) {
     hdrDiv.className = 'ov-card-header';
     hdrDiv.innerHTML = `<div class="ov-card-name">${team}</div>
       ${teamTz ? `<div class="ov-card-tz">${teamTz}</div>` : ''}
-      <div class="ov-card-count">${teamPeople.length}</div>`;
+      <div class="ov-card-count" style="margin-left:auto">${teamPeople.length}</div>`;
     card.appendChild(hdrDiv);
 
     // Stat pills
