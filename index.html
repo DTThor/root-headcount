@@ -257,6 +257,66 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 
 .unassigned-section { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; margin-top: 4px; }
 .unassigned-hdr { padding: 9px 14px; font-size: 12px; font-weight: 600; color: var(--text-muted); background: var(--surface2); border-bottom: 1px solid var(--border); }
+
+/* ── MOBILE ─────────────────────────────────────────────────────────── */
+.mobile-nav { display: none; }
+@media (max-width: 768px) {
+  body { height: 100dvh; overflow: hidden; }
+  .app { height: 100dvh; }
+  .main { position: relative; }
+  .topbar { gap: 8px; padding: 0 10px; }
+  .topbar-title p { display: none; }
+  .topbar-title h1 { font-size: 12px; }
+  .search-wrap { max-width: 130px; }
+  .btn-top { display: none; }
+  .sidebar { display: none; }
+  .changes-panel { display: none; flex-direction: column; position: absolute; inset: 0; z-index: 10; background: var(--bg); width: 100%; }
+  .changes-panel.mob-open { display: flex; }
+  .content { padding: 10px; }
+  .overview-grid { grid-template-columns: 1fr 1fr; gap: 10px; }
+  .stat-card { padding: 12px; }
+  .sv-cs-group-pods { gap: 8px; }
+  .sv-pod { min-width: 90px; }
+  .person-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
+
+  /* Mobile bottom nav */
+  .mobile-nav {
+    display: flex;
+    background: #33342C;
+    border-top: 1px solid rgba(255,255,255,0.08);
+    height: 58px;
+    flex-shrink: 0;
+  }
+  .mob-tab {
+    flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 2px; background: none; border: none; color: rgba(255,255,255,0.45);
+    cursor: pointer; padding: 6px 0; position: relative; transition: color 0.15s;
+  }
+  .mob-tab.active { color: #E9D3BC; }
+  .mob-tab-icon { font-size: 20px; line-height: 1; }
+  .mob-tab-lbl { font-size: 10px; font-weight: 500; letter-spacing: 0.2px; }
+  .mob-badge {
+    position: absolute; top: 5px; right: calc(50% - 20px);
+    background: #9F5E35; color: white; font-size: 9px; font-weight: 700;
+    min-width: 15px; height: 15px; border-radius: 8px;
+    display: none; align-items: center; justify-content: center; padding: 0 3px;
+  }
+  .mob-badge.show { display: flex; }
+
+  /* Mobile team selector bar */
+  .mobile-team-bar {
+    display: flex; gap: 6px; overflow-x: auto; padding: 0 2px 10px;
+    -webkit-overflow-scrolling: touch; scrollbar-width: none; flex-shrink: 0;
+  }
+  .mobile-team-bar::-webkit-scrollbar { display: none; }
+  .mob-team-chip {
+    flex-shrink: 0; padding: 5px 13px; border-radius: 20px;
+    border: 1px solid var(--border); background: var(--surface);
+    color: var(--text-muted); font-size: 12px; font-weight: 500;
+    cursor: pointer; transition: all 0.15s; white-space: nowrap;
+  }
+  .mob-team-chip.active { background: #33342C; color: white; border-color: #33342C; }
+}
 </style>
 <!-- Supabase JS SDK -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -318,6 +378,22 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 </div>
 </div>
 </div>
+
+<nav class="mobile-nav">
+  <button class="mob-tab active" id="mobt-overview" onclick="setMobileTab('overview')">
+    <span class="mob-tab-icon">📊</span>
+    <span class="mob-tab-lbl">Overview</span>
+  </button>
+  <button class="mob-tab" id="mobt-teams" onclick="setMobileTab('teams')">
+    <span class="mob-tab-icon">👥</span>
+    <span class="mob-tab-lbl">Teams</span>
+  </button>
+  <button class="mob-tab" id="mobt-changes" onclick="setMobileTab('changes')">
+    <span class="mob-tab-icon">📋</span>
+    <span class="mob-tab-lbl">Changes</span>
+    <span class="mob-badge" id="mob-changes-badge"></span>
+  </button>
+</nav>
 
 <div id="modal-root"></div>
 
@@ -669,9 +745,43 @@ function setView(v) {
   render();
 }
 
+let mobileActiveTab = 'overview'; // 'overview' | 'teams' | 'changes'
+
+function setMobileTab(tab) {
+  mobileActiveTab = tab;
+  document.querySelectorAll('.mob-tab').forEach(b => b.classList.remove('active'));
+  const btn = document.getElementById('mobt-' + tab);
+  if (btn) btn.classList.add('active');
+
+  const changesPanel = document.querySelector('.changes-panel');
+  if (tab === 'changes') {
+    changesPanel.classList.add('mob-open');
+  } else {
+    changesPanel.classList.remove('mob-open');
+    if (tab === 'overview') {
+      setTab('overview');
+    } else if (tab === 'teams') {
+      // Go to first team if currently on overview
+      const teamKeys = Object.keys(TEAMS);
+      if (currentTab === 'overview') setTab(teamKeys[0]);
+      else render(); // re-render to add team bar
+    }
+  }
+}
+
 function setTab(tab) {
   currentTab = tab;
   document.querySelectorAll('.nav-item').forEach(n => n.classList.toggle('active', n.dataset.tab === tab));
+  // Sync mobile tab state
+  if (tab === 'overview') {
+    mobileActiveTab = 'overview';
+    document.querySelectorAll('.mob-tab').forEach(b => b.classList.remove('active'));
+    document.getElementById('mobt-overview')?.classList.add('active');
+  } else {
+    mobileActiveTab = 'teams';
+    document.querySelectorAll('.mob-tab').forEach(b => b.classList.remove('active'));
+    document.getElementById('mobt-teams')?.classList.add('active');
+  }
   render();
 }
 
@@ -688,6 +798,20 @@ function render() {
     const teamPeople = allPeople.filter(p => p.team === team);
     renderPodView(content, team, teamPeople, allPeople);
   }
+
+  // On mobile teams tab, inject team selector bar at top of content
+  if (window.innerWidth <= 768 && mobileActiveTab === 'teams') {
+    const bar = document.createElement('div');
+    bar.className = 'mobile-team-bar';
+    Object.keys(TEAMS).forEach(team => {
+      const chip = document.createElement('button');
+      chip.className = 'mob-team-chip' + (currentTab === team ? ' active' : '');
+      chip.textContent = team;
+      chip.onclick = () => setTab(team);
+      bar.appendChild(chip);
+    });
+    content.insertBefore(bar, content.firstChild);
+  }
 }
 
 function updateBadges(allPeople) {
@@ -702,25 +826,60 @@ function updateChangesList() {
   const count = document.getElementById('change-count');
   count.textContent = state.events.length;
 
+  // Update mobile badge
+  const badge = document.getElementById('mob-changes-badge');
+  if (badge) {
+    badge.textContent = state.events.length || '';
+    badge.classList.toggle('show', state.events.length > 0);
+  }
+
   if (state.events.length === 0) {
     list.innerHTML = '<div class="empty-msg"><div class="eicon">📋</div>No planned changes yet</div>';
     return;
   }
 
-  list.innerHTML = state.events.map(ev => {
+  // Sort by date ascending
+  const sorted = [...state.events].sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+
+  list.innerHTML = sorted.map(ev => {
     const evType = EVENT_TYPES.find(x => x.value === ev.type);
-    let detail = '';
-    if (ev.personId) {
-      const p = state.people.find(x => x.id === ev.personId);
-      detail = p ? p.first + ' ' + p.last : 'Unknown';
-    } else if (ev.newFirst) {
-      detail = ev.newFirst + ' ' + ev.newLast;
-    }
     const ctClass = 'ct-' + ev.type;
+    const p = ev.personId ? state.people.find(x => x.id === ev.personId) : null;
+    const pName = p ? `${p.first} ${p.last}` : '';
+    const dateStr = ev.date ? new Date(ev.date + 'T00:00:00').toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'}) : '';
+
+    let name = '', detail = '';
+
+    if (ev.type === 'new_hire') {
+      name = `${ev.newFirst || ''} ${ev.newLast || ''}`.trim() || 'New Hire';
+      const parts = [ev.toRole, ev.toTeam ? ev.toTeam + ' team' : ''].filter(Boolean);
+      detail = parts.join(' · ');
+    } else if (ev.type === 'promotion') {
+      name = pName || 'Unknown';
+      const fromRole = p ? p.role : '';
+      const toRole = ev.toRole || '';
+      const team = ev.toTeam || (p ? p.team : '');
+      const roleStr = fromRole && toRole ? `${fromRole} → ${toRole}` : toRole;
+      detail = [roleStr, team ? team + ' team' : ''].filter(Boolean).join(' · ');
+    } else if (ev.type === 'team_move') {
+      name = pName || 'Unknown';
+      const fromTeam = p ? p.team : '';
+      detail = fromTeam && ev.toTeam ? `${fromTeam} → ${ev.toTeam}` : (ev.toTeam || '');
+    } else if (ev.type === 'backfill') {
+      name = p ? pName : (ev.toRole ? `${ev.toRole} Backfill` : 'Open Position');
+      detail = ev.toTeam || (p ? p.team + ' team' : '');
+    } else if (ev.type === 'departure') {
+      name = pName || 'Unknown';
+      detail = p ? `${p.role} · ${p.team} team` : '';
+    } else {
+      name = pName || 'Unknown';
+    }
+
     return `<div class="citem" onclick="editEvent('${ev.id}')">
       <span class="ctag ${ctClass}">${evType.label}</span>
-      <div class="ci-name">${detail}</div>
-      <div class="ci-date">${ev.date}</div>
+      <div class="ci-name">${name}</div>
+      ${detail ? `<div class="ci-detail">${detail}</div>` : ''}
+      ${dateStr ? `<div class="ci-date">${dateStr}</div>` : ''}
     </div>`;
   }).join('');
 }
