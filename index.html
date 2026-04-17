@@ -262,17 +262,21 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 .mobile-nav { display: none; }
 @media (max-width: 768px) {
   body { height: 100dvh; overflow: hidden; }
-  .app { height: 100dvh; }
-  .main { position: relative; }
-  .topbar { gap: 8px; padding: 0 10px; }
+  .app { height: 100dvh; display: flex; flex-direction: column; }
+  .main { position: relative; flex: 1; min-height: 0; overflow: hidden; }
+  .content { flex: 1; min-height: 0; overflow-y: auto; padding: 10px; }
+  .topbar { gap: 8px; padding: 0 10px; flex-shrink: 0; }
   .topbar-title p { display: none; }
   .topbar-title h1 { font-size: 12px; }
   .search-wrap { max-width: 130px; }
   .btn-top { display: none; }
   .sidebar { display: none; }
-  .changes-panel { display: none; flex-direction: column; position: absolute; inset: 0; z-index: 10; background: var(--bg); width: 100%; }
+  .changes-panel {
+    display: none; flex-direction: column;
+    position: absolute; inset: 0; z-index: 10;
+    background: var(--bg); width: 100%;
+  }
   .changes-panel.mob-open { display: flex; }
-  .content { padding: 10px; }
   .overview-grid { grid-template-columns: 1fr 1fr; gap: 10px; }
   .stat-card { padding: 12px; }
   .sv-cs-group-pods { gap: 8px; }
@@ -281,22 +285,24 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 
   /* Mobile bottom nav */
   .mobile-nav {
-    display: flex;
+    display: flex; flex-shrink: 0;
     background: #33342C;
     border-top: 1px solid rgba(255,255,255,0.08);
-    height: 58px;
-    flex-shrink: 0;
+    height: calc(56px + env(safe-area-inset-bottom, 0px));
+    padding-bottom: env(safe-area-inset-bottom, 0px);
   }
   .mob-tab {
     flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
-    gap: 2px; background: none; border: none; color: rgba(255,255,255,0.45);
-    cursor: pointer; padding: 6px 0; position: relative; transition: color 0.15s;
+    gap: 3px; background: none; border: none; color: rgba(255,255,255,0.4);
+    cursor: pointer; padding: 6px 0 4px; position: relative; transition: color 0.15s;
+    -webkit-tap-highlight-color: transparent;
   }
   .mob-tab.active { color: #E9D3BC; }
-  .mob-tab-icon { font-size: 20px; line-height: 1; }
+  .mob-tab svg { width: 22px; height: 22px; stroke: currentColor; fill: none; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
+  .mob-tab.active svg { stroke-width: 2.25; }
   .mob-tab-lbl { font-size: 10px; font-weight: 500; letter-spacing: 0.2px; }
   .mob-badge {
-    position: absolute; top: 5px; right: calc(50% - 20px);
+    position: absolute; top: 4px; right: calc(50% - 22px);
     background: #9F5E35; color: white; font-size: 9px; font-weight: 700;
     min-width: 15px; height: 15px; border-radius: 8px;
     display: none; align-items: center; justify-content: center; padding: 0 3px;
@@ -314,6 +320,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
     border: 1px solid var(--border); background: var(--surface);
     color: var(--text-muted); font-size: 12px; font-weight: 500;
     cursor: pointer; transition: all 0.15s; white-space: nowrap;
+    -webkit-tap-highlight-color: transparent;
   }
   .mob-team-chip.active { background: #33342C; color: white; border-color: #33342C; }
 }
@@ -381,15 +388,15 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 
 <nav class="mobile-nav">
   <button class="mob-tab active" id="mobt-overview" onclick="setMobileTab('overview')">
-    <span class="mob-tab-icon">📊</span>
+    <svg viewBox="0 0 24 24"><rect x="3" y="13" width="4" height="8" rx="1"/><rect x="10" y="9" width="4" height="12" rx="1"/><rect x="17" y="5" width="4" height="16" rx="1"/></svg>
     <span class="mob-tab-lbl">Overview</span>
   </button>
   <button class="mob-tab" id="mobt-teams" onclick="setMobileTab('teams')">
-    <span class="mob-tab-icon">👥</span>
+    <svg viewBox="0 0 24 24"><circle cx="9" cy="7" r="3"/><path d="M3 21v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/><path d="M21 21v-2a4 4 0 0 0-3-3.85"/></svg>
     <span class="mob-tab-lbl">Teams</span>
   </button>
   <button class="mob-tab" id="mobt-changes" onclick="setMobileTab('changes')">
-    <span class="mob-tab-icon">📋</span>
+    <svg viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>
     <span class="mob-tab-lbl">Changes</span>
     <span class="mob-badge" id="mob-changes-badge"></span>
   </button>
@@ -852,7 +859,7 @@ function updateChangesList() {
 
     if (ev.type === 'new_hire') {
       name = `${ev.newFirst || ''} ${ev.newLast || ''}`.trim() || 'New Hire';
-      const parts = [ev.toRole, ev.toTeam ? ev.toTeam + ' team' : ''].filter(Boolean);
+      const parts = [ev.toRole, ev.toTeam].filter(Boolean);
       detail = parts.join(' · ');
     } else if (ev.type === 'promotion') {
       name = pName || 'Unknown';
@@ -860,14 +867,14 @@ function updateChangesList() {
       const toRole = ev.toRole || '';
       const team = ev.toTeam || (p ? p.team : '');
       const roleStr = fromRole && toRole ? `${fromRole} → ${toRole}` : toRole;
-      detail = [roleStr, team ? team + ' team' : ''].filter(Boolean).join(' · ');
+      detail = [roleStr, team].filter(Boolean).join(' · ');
     } else if (ev.type === 'team_move') {
       name = pName || 'Unknown';
       const fromTeam = p ? p.team : '';
       detail = fromTeam && ev.toTeam ? `${fromTeam} → ${ev.toTeam}` : (ev.toTeam || '');
     } else if (ev.type === 'backfill') {
       name = p ? pName : (ev.toRole ? `${ev.toRole} Backfill` : 'Open Position');
-      detail = ev.toTeam || (p ? p.team + ' team' : '');
+      detail = ev.toTeam || (p ? p.team : '');
     } else if (ev.type === 'departure') {
       name = pName || 'Unknown';
       detail = p ? `${p.role} · ${p.team} team` : '';
