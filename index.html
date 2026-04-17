@@ -1767,7 +1767,7 @@ function openPersonModal(personId) {
     fs4.appendChild(opt);
   });
   fs4.value = person.team;
-  fs4.onchange = (e) => { person.team = e.target.value; };
+  fs4.onchange = (e) => { person.team = e.target.value; buildPersonSupportsUI(person, supportsContainer); };
   fg4.appendChild(l4);
   fg4.appendChild(fs4);
   body.appendChild(fg4);
@@ -1807,38 +1807,11 @@ function openPersonModal(personId) {
   body.appendChild(fg6);
 
   // Supports IDs — only for AFA2, AFA1, CSA, CSC (not for pod leaders SA/LFA/FA)
+  const supportsContainer = document.createElement('div');
   if (!['SA','LFA','FA'].includes(person.role)) {
-    const fg7 = document.createElement('div');
-    fg7.className = 'fg';
-    const l7 = document.createElement('label');
-    l7.className = 'fl';
-    l7.textContent = 'Supports';
-    const supportList = document.createElement('div');
-    supportList.style.fontSize = '12px';
-    const allAdvisory = state.people.filter(p => ['SA','LFA','FA'].includes(p.role) && p.id !== personId);
-    allAdvisory.forEach(ad => {
-      const item = document.createElement('div');
-      item.className = 'criteria-item';
-      const cb = document.createElement('input');
-      cb.type = 'checkbox';
-      cb.checked = person.supportsIds.includes(ad.id);
-      cb.onchange = (e) => {
-        if (e.target.checked) {
-          if (!person.supportsIds.includes(ad.id)) person.supportsIds.push(ad.id);
-        } else {
-          person.supportsIds = person.supportsIds.filter(id => id !== ad.id);
-        }
-      };
-      const lbl = document.createElement('label');
-      lbl.textContent = ad.first + ' ' + ad.last + ' (' + ad.role + ')';
-      item.appendChild(cb);
-      item.appendChild(lbl);
-      supportList.appendChild(item);
-    });
-    fg7.appendChild(l7);
-    fg7.appendChild(supportList);
-    body.appendChild(fg7);
+    buildPersonSupportsUI(person, supportsContainer);
   }
+  body.appendChild(supportsContainer);
 
   // AUM (for LFA/FA)
   if (person.role === 'LFA' || person.role === 'FA') {
@@ -2172,6 +2145,60 @@ function openAddPersonModal(defaults = {}) {
   };
   state.people.push(person);
   openPersonModal(newId);
+}
+
+// Builds (or rebuilds) the "Supports" checkbox section inside the person modal.
+function buildPersonSupportsUI(person, containerEl) {
+  containerEl.innerHTML = '';
+  const fg = document.createElement('div');
+  fg.className = 'fg';
+  const lbl = document.createElement('label');
+  lbl.className = 'fl';
+  lbl.textContent = 'Supports';
+  fg.appendChild(lbl);
+
+  const supportList = document.createElement('div');
+  supportList.style.fontSize = '12px';
+
+  if (!person.team) {
+    const warn = document.createElement('div');
+    warn.style.cssText = 'color:var(--warning-text);background:var(--warning-bg);border-radius:6px;padding:7px 10px;font-size:12px;';
+    warn.textContent = 'Select a team above to see support options.';
+    supportList.appendChild(warn);
+  } else {
+    const advisors = state.people.filter(p =>
+      ['SA', 'LFA', 'FA'].includes(p.role) && p.team === person.team && p.id !== person.id
+    );
+    if (advisors.length === 0) {
+      const empty = document.createElement('div');
+      empty.style.cssText = 'color:#999;font-size:12px;font-style:italic;padding:4px 0';
+      empty.textContent = 'No SA / LFA / FA found on this team.';
+      supportList.appendChild(empty);
+    } else {
+      advisors.forEach(ad => {
+        const item = document.createElement('div');
+        item.className = 'criteria-item';
+        const cb = document.createElement('input');
+        cb.type = 'checkbox';
+        cb.checked = (person.supportsIds || []).includes(ad.id);
+        cb.onchange = (e) => {
+          if (!person.supportsIds) person.supportsIds = [];
+          if (e.target.checked) {
+            if (!person.supportsIds.includes(ad.id)) person.supportsIds.push(ad.id);
+          } else {
+            person.supportsIds = person.supportsIds.filter(id => id !== ad.id);
+          }
+        };
+        const l = document.createElement('label');
+        l.textContent = ad.first + ' ' + ad.last + ' (' + ad.role + ')';
+        item.appendChild(cb);
+        item.appendChild(l);
+        supportList.appendChild(item);
+      });
+    }
+  }
+  fg.appendChild(supportList);
+  containerEl.appendChild(fg);
 }
 
 // Builds (or rebuilds) the "Supports" checkbox section inside an event modal.
