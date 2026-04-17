@@ -44,10 +44,10 @@ body { font-family: 'Sailec', -apple-system, BlinkMacSystemFont, sans-serif; bac
 
 /* TOPBAR */
 .topbar { background: #33342C; color: white; padding: 0 16px; display: flex; align-items: center; gap: 12px; height: 48px; flex-shrink: 0; }
-.topbar-title { align-items: flex-start !important; padding-top: 14px; }
+.topbar-title { align-items: flex-start !important; }
 .topbar-title h1 { font-size: 14px; font-weight: 700; white-space: nowrap; font-family: 'Sailec', sans-serif; }
 .topbar-title p { font-size: 10px; opacity: 0.6; }
-.search-wrap { position: relative; flex: 1; max-width: 220px; }
+.search-wrap { position: relative; max-width: 220px; width: 220px; margin-left: auto; }
 .search-input { width: 100%; box-sizing: border-box; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.18); border-radius: 8px; padding: 6px 12px 6px 32px; color: white; font-size: 13px; outline: none; transition: background 0.15s, border-color 0.15s; }
 .search-input::placeholder { color: rgba(255,255,255,0.45); }
 .search-input:focus { background: rgba(255,255,255,0.18); border-color: rgba(255,255,255,0.35); }
@@ -59,7 +59,7 @@ body { font-family: 'Sailec', -apple-system, BlinkMacSystemFont, sans-serif; bac
 .search-result-name { font-size: 13px; font-weight: 600; color: var(--text); }
 .search-result-meta { font-size: 11px; color: var(--text-muted); margin-top: 1px; }
 .search-no-results { padding: 14px; font-size: 12px; color: var(--text-muted); text-align: center; }
-.view-toggle { display: flex; background: rgba(255,255,255,0.12); border-radius: 6px; padding: 2px; margin-left: auto; }
+.view-toggle { display: flex; background: rgba(255,255,255,0.12); border-radius: 6px; padding: 2px; }
 .view-toggle button { background: none; border: none; color: rgba(255,255,255,0.7); padding: 4px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: 500; transition: all 0.15s; font-family: 'Sailec', sans-serif; }
 .view-toggle button.active { background: rgba(255,255,255,0.2); color: white; }
 .proj-wrap { display: none; align-items: center; gap: 6px; color: rgba(255,255,255,0.7); font-size: 12px; }
