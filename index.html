@@ -736,11 +736,13 @@ function getProjDate() {
 }
 
 function getVisiblePeople() {
-  if (currentView === 'current') return state.people;
-  const cutoff = getProjDate();
+  const todayStr = new Date().toISOString().split('T')[0];
+  const cutoffStr = currentView === 'current'
+    ? todayStr
+    : (document.getElementById('proj-date')?.value || todayStr);
   const visible = JSON.parse(JSON.stringify(state.people));
   state.events.forEach(ev => {
-    if (new Date(ev.date) > cutoff) return;
+    if (!ev.date || ev.date > cutoffStr) return;
     let p = visible.find(x => x.id === ev.personId);
     if (!p && ev.type === 'new_hire') {
       p = { id: ev.personId || 'nh_' + ev.id, first: ev.newFirst, last: ev.newLast, role: ev.toRole, team: ev.toTeam, dept: ev.toRole.startsWith('CS') ? 'Client Service' : 'Advisory', status: 'active', criteria: {}, aum: null, supportsIds: ev.supportsIds || [] };
@@ -857,13 +859,19 @@ function updateBadges(allPeople) {
 function updateChangesList() {
   const list = document.getElementById('changes-list');
   const count = document.getElementById('change-count');
-  count.textContent = state.events.length;
+  const todayStr = new Date().toISOString().split('T')[0];
 
-  // Update mobile badge
+  // Split into upcoming (future) and applied (today or earlier)
+  const upcoming = state.events.filter(ev => !ev.date || ev.date > todayStr);
+  const applied  = state.events.filter(ev => ev.date && ev.date <= todayStr);
+
+  count.textContent = upcoming.length;
+
+  // Update mobile badge (only upcoming)
   const badge = document.getElementById('mob-changes-badge');
   if (badge) {
-    badge.textContent = state.events.length || '';
-    badge.classList.toggle('show', state.events.length > 0);
+    badge.textContent = upcoming.length || '';
+    badge.classList.toggle('show', upcoming.length > 0);
   }
 
   if (state.events.length === 0) {
@@ -871,8 +879,14 @@ function updateChangesList() {
     return;
   }
 
-  // Sort by date ascending
-  const sorted = [...state.events].sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+  if (upcoming.length === 0 && applied.length > 0) {
+    list.innerHTML = `<div class="empty-msg"><div class="eicon">✅</div>All changes applied</div>
+      <div style="text-align:center;margin-top:4px;font-size:11px;color:var(--text-muted);padding:0 12px">${applied.length} change${applied.length !== 1 ? 's' : ''} now reflected in current view</div>`;
+    return;
+  }
+
+  // Sort upcoming by date ascending
+  const sorted = [...upcoming].sort((a, b) => (a.date || '').localeCompare(b.date || ''));
 
   list.innerHTML = sorted.map(ev => {
     const evType = EVENT_TYPES.find(x => x.value === ev.type);
@@ -915,6 +929,10 @@ function updateChangesList() {
       ${dateStr ? `<div class="ci-date">${dateStr}</div>` : ''}
     </div>`;
   }).join('');
+
+  if (applied.length > 0) {
+    list.innerHTML += `<div style="margin-top:8px;padding:8px 4px 4px;border-top:1px solid var(--border);text-align:center;font-size:11px;color:var(--text-muted)">✅ ${applied.length} change${applied.length !== 1 ? 's' : ''} applied — now in current view</div>`;
+  }
 }
 
 // ── Module-level rendering helpers ───────────────────────────────────────────
