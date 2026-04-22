@@ -881,35 +881,20 @@ function updateChangesList() {
     return;
   }
 
-  if (upcoming.length === 0 && applied.length > 0) {
-    list.innerHTML = `<div class="empty-msg"><div class="eicon">✅</div>All changes applied</div>
-      <div style="text-align:center;margin-top:4px;font-size:11px;color:var(--text-muted);padding:0 12px">${applied.length} change${applied.length !== 1 ? 's' : ''} now reflected in current view</div>`;
-    return;
-  }
-
-  // Sort upcoming by date ascending
-  const sorted = [...upcoming].sort((a, b) => (a.date || '').localeCompare(b.date || ''));
-
-  list.innerHTML = sorted.map(ev => {
+  function buildEventCard(ev, dimmed) {
     const evType = EVENT_TYPES.find(x => x.value === ev.type);
     const ctClass = 'ct-' + ev.type;
     const p = ev.personId ? state.people.find(x => x.id === ev.personId) : null;
     const pName = p ? `${p.first} ${p.last}` : '';
     const dateStr = ev.date ? new Date(ev.date + 'T00:00:00').toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'}) : '';
-
     let name = '', detail = '';
-
     if (ev.type === 'new_hire') {
       name = `${ev.newFirst || ''} ${ev.newLast || ''}`.trim() || 'New Hire';
-      const parts = [ev.toRole, ev.toTeam].filter(Boolean);
-      detail = parts.join(' · ');
+      detail = [ev.toRole, ev.toTeam].filter(Boolean).join(' · ');
     } else if (ev.type === 'promotion') {
       name = pName || 'Unknown';
-      const fromRole = p ? p.role : '';
-      const toRole = ev.toRole || '';
-      const team = ev.toTeam || (p ? p.team : '');
-      const roleStr = fromRole && toRole ? `${fromRole} → ${toRole}` : toRole;
-      detail = [roleStr, team].filter(Boolean).join(' · ');
+      const roleStr = (p && ev.toRole) ? `${p.role} → ${ev.toRole}` : (ev.toRole || '');
+      detail = [roleStr, ev.toTeam || (p ? p.team : '')].filter(Boolean).join(' · ');
     } else if (ev.type === 'team_move') {
       name = pName || 'Unknown';
       const fromTeam = p ? p.team : '';
@@ -919,22 +904,34 @@ function updateChangesList() {
       detail = ev.toTeam || (p ? p.team : '');
     } else if (ev.type === 'departure') {
       name = pName || 'Unknown';
-      detail = p ? `${p.role} · ${p.team} team` : '';
+      detail = p ? `${p.role} · ${p.team}` : '';
     } else {
       name = pName || 'Unknown';
     }
-
-    return `<div class="citem" onclick="editEvent('${ev.id}')">
-      <span class="ctag ${ctClass}">${evType.label}</span>
+    const dimStyle = dimmed ? 'opacity:0.55;' : '';
+    const appliedBadge = dimmed ? `<span style="font-size:9px;font-weight:700;padding:1px 6px;border-radius:8px;background:#d4edda;color:#155724;margin-left:4px">✓ applied</span>` : '';
+    return `<div class="citem" style="${dimStyle}" onclick="editEvent('${ev.id}')">
+      <span class="ctag ${ctClass}">${evType ? evType.label : ev.type}</span>${appliedBadge}
       <div class="ci-name">${name}</div>
       ${detail ? `<div class="ci-detail">${detail}</div>` : ''}
       ${dateStr ? `<div class="ci-date">${dateStr}</div>` : ''}
     </div>`;
-  }).join('');
+  }
+
+  // Sort upcoming by date ascending
+  const sorted = [...upcoming].sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+  const sortedApplied = [...applied].sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+
+  let html = sorted.map(ev => buildEventCard(ev, false)).join('');
 
   if (applied.length > 0) {
-    list.innerHTML += `<div style="margin-top:8px;padding:8px 4px 4px;border-top:1px solid var(--border);text-align:center;font-size:11px;color:var(--text-muted)">✅ ${applied.length} change${applied.length !== 1 ? 's' : ''} applied — now in current view</div>`;
+    const divider = upcoming.length > 0
+      ? `<div style="margin:10px 0 6px;padding-top:8px;border-top:1px solid var(--border);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted)">Applied</div>`
+      : `<div style="margin-bottom:6px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted)">Applied</div>`;
+    html += divider + sortedApplied.map(ev => buildEventCard(ev, true)).join('');
   }
+
+  list.innerHTML = html || '<div class="empty-msg"><div class="eicon">📋</div>No planned changes yet</div>';
 }
 
 // ── Module-level rendering helpers ───────────────────────────────────────────
