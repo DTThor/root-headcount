@@ -743,11 +743,13 @@ function getVisiblePeople() {
   const visible = JSON.parse(JSON.stringify(state.people));
   state.events.forEach(ev => {
     if (!ev.date || ev.date > cutoffStr) return;
-    let p = visible.find(x => x.id === ev.personId);
-    if (!p && ev.type === 'new_hire') {
-      p = { id: ev.personId || 'nh_' + ev.id, first: ev.newFirst, last: ev.newLast, role: ev.toRole, team: ev.toTeam, dept: ev.toRole.startsWith('CS') ? 'Client Service' : 'Advisory', status: 'active', criteria: {}, aum: null, supportsIds: ev.supportsIds || [] };
-      visible.push(p);
+    if (ev.type === 'new_hire') {
+      // Always create a fresh person — never reuse an existing person for new_hire
+      const newP = { id: 'nh_' + ev.id, first: ev.newFirst || '', last: ev.newLast || '', role: ev.toRole || 'AFA2', team: ev.toTeam || '', dept: (ev.toRole || '').startsWith('CS') ? 'Client Service' : 'Advisory', status: 'active', criteria: {}, aum: null, supportsIds: ev.supportsIds || [] };
+      visible.push(newP);
+      return;
     }
+    let p = visible.find(x => x.id === ev.personId);
     if (!p) return;
     if (ev.type === 'on_leave') p.status = 'leave';
     else if (ev.type === 'return') p.status = 'active';
@@ -1733,6 +1735,13 @@ function renderSupportViewLayout(el, team, people, allPeople) {
 }
 
 function openPersonModal(personId) {
+  // Projected new hires have nh_* IDs — route to their event editor
+  if (typeof personId === 'string' && personId.startsWith('nh_')) {
+    const eventId = personId.slice(3);
+    const ev = state.events.find(e => e.id === eventId);
+    if (ev) openProjectedPersonModal(ev);
+    return;
+  }
   let person = state.people.find(p => p.id === personId);
   if (!person) {
     alert('Person not found');
@@ -1875,6 +1884,14 @@ function openPersonModal(personId) {
   }
   body.appendChild(supportsContainer);
 
+  // Supported By — for SA, LFA, FA: reverse lookup showing who supports them
+  const supportedByPendingUpdates = [];
+  const supportedByContainer = document.createElement('div');
+  if (['SA','LFA','FA'].includes(person.role)) {
+    buildSupportedByUI(person.id, person.team, supportedByContainer, supportedByPendingUpdates);
+  }
+  body.appendChild(supportedByContainer);
+
   // AUM (for LFA/FA)
   if (person.role === 'LFA' || person.role === 'FA') {
     const fg8 = document.createElement('div');
@@ -1970,6 +1987,7 @@ function openPersonModal(personId) {
   saveBtn.className = 'btn-primary';
   saveBtn.textContent = 'Save';
   saveBtn.onclick = () => {
+    applyPendingUpdates(supportedByPendingUpdates);
     const idx = state.people.findIndex(p => p.id === personId);
     if (idx >= 0) state.people[idx] = person;
     saveState();
@@ -2001,6 +2019,137 @@ function openPersonModal(personId) {
     }
   };
 
+  modalRoot.innerHTML = '';
+  modalRoot.appendChild(overlay);
+  modalRoot.style.display = 'block';
+}
+
+// ── Projected New Hire Edit Modal ─────────────────────────────────────────────
+function openProjectedPersonModal(ev) {
+  const event = JSON.parse(JSON.stringify(ev));
+  const personId = 'nh_' + ev.id;
+
+  const modalRoot = document.getElementById('modal-root');
+  const overlay = document.createElement('div');
+  overlay.className = 'overlay';
+  const modal = document.createElement('div');
+  modal.className = 'modal';
+
+  const header = document.createElement('div');
+  header.className = 'modal-hdr';
+  const titleWrap = document.createElement('div');
+  titleWrap.style.cssText = 'display:flex;align-items:center;gap:8px';
+  const title = document.createElement('h3');
+  title.textContent = (event.newFirst || event.newLast) ? (event.newFirst + ' ' + event.newLast).trim() : 'Incoming Person';
+  const badge = document.createElement('span');
+  badge.style.cssText = 'font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;background:#cce5ff;color:#004085';
+  badge.textContent = 'Incoming';
+  titleWrap.appendChild(title);
+  titleWrap.appendChild(badge);
+  header.appendChild(titleWrap);
+  const closeBtn = document.createElement('button');
+  closeBtn.className = 'modal-close';
+  closeBtn.textContent = '×';
+  closeBtn.onclick = () => { modalRoot.innerHTML = ''; modalRoot.style.display = 'none'; };
+  header.appendChild(closeBtn);
+  modal.appendChild(header);
+
+  const body = document.createElement('div');
+  body.className = 'modal-body';
+
+  // Name row
+  const frow = document.createElement('div');
+  frow.className = 'frow';
+  const fg1 = document.createElement('div'); fg1.className = 'fg';
+  const l1 = document.createElement('label'); l1.className = 'fl'; l1.textContent = 'First Name';
+  const fi1 = document.createElement('input'); fi1.className = 'fi'; fi1.type = 'text'; fi1.value = event.newFirst || '';
+  fi1.oninput = (e) => { event.newFirst = e.target.value; };
+  fg1.appendChild(l1); fg1.appendChild(fi1); frow.appendChild(fg1);
+  const fg2 = document.createElement('div'); fg2.className = 'fg';
+  const l2 = document.createElement('label'); l2.className = 'fl'; l2.textContent = 'Last Name';
+  const fi2 = document.createElement('input'); fi2.className = 'fi'; fi2.type = 'text'; fi2.value = event.newLast || '';
+  fi2.oninput = (e) => { event.newLast = e.target.value; };
+  fg2.appendChild(l2); fg2.appendChild(fi2); frow.appendChild(fg2);
+  body.appendChild(frow);
+
+  // Role
+  const fg3 = document.createElement('div'); fg3.className = 'fg';
+  const l3 = document.createElement('label'); l3.className = 'fl'; l3.textContent = 'Role';
+  const fs3 = document.createElement('select'); fs3.className = 'fs';
+  ROLES.forEach(r => { const opt = document.createElement('option'); opt.value = r; opt.textContent = ROLE_LABELS[r] || r; fs3.appendChild(opt); });
+  fs3.value = event.toRole || 'AFA2';
+  fs3.onchange = (e) => { event.toRole = e.target.value; rebuildSupportsSection(); };
+  fg3.appendChild(l3); fg3.appendChild(fs3); body.appendChild(fg3);
+
+  // Team
+  const fg4 = document.createElement('div'); fg4.className = 'fg';
+  const l4 = document.createElement('label'); l4.className = 'fl'; l4.textContent = 'Team';
+  const fs4 = document.createElement('select'); fs4.className = 'fs';
+  Object.keys(TEAMS).forEach(t => { const opt = document.createElement('option'); opt.value = t; opt.textContent = t; fs4.appendChild(opt); });
+  fs4.value = event.toTeam || '';
+  fs4.onchange = (e) => { event.toTeam = e.target.value; rebuildSupportsSection(); };
+  fg4.appendChild(l4); fg4.appendChild(fs4); body.appendChild(fg4);
+
+  // Start Date
+  const fg5 = document.createElement('div'); fg5.className = 'fg';
+  const l5 = document.createElement('label'); l5.className = 'fl'; l5.textContent = 'Start Date';
+  const fi5 = document.createElement('input'); fi5.className = 'fi'; fi5.type = 'date'; fi5.value = event.date || '';
+  fi5.onchange = (e) => { event.date = e.target.value; };
+  fg5.appendChild(l5); fg5.appendChild(fi5); body.appendChild(fg5);
+
+  // Notes
+  const fg6 = document.createElement('div'); fg6.className = 'fg';
+  const l6 = document.createElement('label'); l6.className = 'fl'; l6.textContent = 'Notes';
+  const ta = document.createElement('textarea'); ta.className = 'ftextarea'; ta.value = event.notes || '';
+  ta.onchange = (e) => { event.notes = e.target.value; };
+  fg6.appendChild(l6); fg6.appendChild(ta); body.appendChild(fg6);
+
+  // Supports / Supported By (dynamic)
+  const supportsContainer = document.createElement('div');
+  body.appendChild(supportsContainer);
+  const pendingUpdates = [];
+
+  function rebuildSupportsSection() {
+    supportsContainer.innerHTML = '';
+    pendingUpdates.length = 0;
+    if (['AFA2','AFA1','CSA','CSC'].includes(event.toRole)) {
+      buildEventSupportsUI(event, supportsContainer);
+    } else if (['SA','LFA','FA'].includes(event.toRole) && event.toTeam) {
+      buildSupportedByUI(personId, event.toTeam, supportsContainer, pendingUpdates);
+    }
+  }
+  rebuildSupportsSection();
+
+  modal.appendChild(body);
+
+  const footer = document.createElement('div');
+  footer.className = 'modal-footer';
+  const deleteBtn = document.createElement('button');
+  deleteBtn.className = 'btn-danger';
+  deleteBtn.textContent = 'Delete';
+  deleteBtn.onclick = () => {
+    if (confirm('Remove ' + (event.newFirst || 'this') + ' ' + (event.newLast || 'person') + ' from planned changes?')) {
+      state.events = state.events.filter(e => e.id !== ev.id);
+      saveState(); render();
+      modalRoot.innerHTML = ''; modalRoot.style.display = 'none';
+    }
+  };
+  const saveBtn = document.createElement('button');
+  saveBtn.className = 'btn-primary';
+  saveBtn.textContent = 'Save';
+  saveBtn.onclick = () => {
+    applyPendingUpdates(pendingUpdates);
+    const idx = state.events.findIndex(e => e.id === ev.id);
+    if (idx >= 0) state.events[idx] = event;
+    saveState(); render();
+    modalRoot.innerHTML = ''; modalRoot.style.display = 'none';
+  };
+  footer.appendChild(deleteBtn);
+  footer.appendChild(saveBtn);
+  modal.appendChild(footer);
+
+  overlay.appendChild(modal);
+  overlay.onclick = (e) => { if (e.target === overlay) { modalRoot.innerHTML = ''; modalRoot.style.display = 'none'; } };
   modalRoot.innerHTML = '';
   modalRoot.appendChild(overlay);
   modalRoot.style.display = 'block';
@@ -2313,6 +2462,98 @@ function openAddPersonModal(defaults = {}) {
   fi1.focus();
 }
 
+// Builds a "Supported By" section for SA/LFA/FA — reverse lookup of who supports this person.
+// pendingUpdates: array to collect {supporterId, personId, add} changes to apply on Save.
+function buildSupportedByUI(personId, team, containerEl, pendingUpdates) {
+  containerEl.innerHTML = '';
+  if (!team) {
+    const warn = document.createElement('div');
+    warn.style.cssText = 'color:var(--warning-text);background:var(--warning-bg);border-radius:6px;padding:7px 10px;font-size:12px;margin-top:10px';
+    warn.textContent = 'Select a team to see support options.';
+    containerEl.appendChild(warn);
+    return;
+  }
+  const section = document.createElement('div');
+  section.className = 'criteria-section';
+  const titleEl = document.createElement('div');
+  titleEl.className = 'criteria-title';
+  titleEl.textContent = 'Supported By';
+  section.appendChild(titleEl);
+
+  const visiblePeople = getVisiblePeople();
+  const potentialSupporters = visiblePeople.filter(p =>
+    ['AFA2', 'AFA1', 'CSA', 'CSC'].includes(p.role) && p.team === team
+  );
+
+  if (potentialSupporters.length === 0) {
+    const note = document.createElement('div');
+    note.style.cssText = 'color:#999;font-size:12px;font-style:italic;padding:4px 0';
+    note.textContent = 'No AFA or CS staff on this team yet.';
+    section.appendChild(note);
+  } else {
+    potentialSupporters.forEach(supporter => {
+      // Check real supportsIds: for nh_ supporter check the event, else check state.people
+      let currentSupportsIds = [];
+      if (supporter.id.startsWith('nh_')) {
+        const evId = supporter.id.slice(3);
+        const sEv = state.events.find(x => x.id === evId);
+        currentSupportsIds = sEv ? (sEv.supportsIds || []) : [];
+      } else {
+        const sp = state.people.find(x => x.id === supporter.id);
+        currentSupportsIds = sp ? (sp.supportsIds || []) : [];
+      }
+      const isSupporting = currentSupportsIds.includes(personId);
+
+      const item = document.createElement('div');
+      item.className = 'criteria-item';
+      const cb = document.createElement('input');
+      cb.type = 'checkbox';
+      cb.checked = isSupporting;
+      cb.onchange = (e) => {
+        const newState = e.target.checked;
+        // Remove existing pending update for this supporter, then add new one if changed
+        const existingIdx = pendingUpdates.findIndex(u => u.supporterId === supporter.id);
+        if (existingIdx >= 0) pendingUpdates.splice(existingIdx, 1);
+        if (newState !== isSupporting) {
+          pendingUpdates.push({ supporterId: supporter.id, personId, add: newState });
+        }
+      };
+      const l = document.createElement('label');
+      l.style.cssText = 'display:flex;flex-direction:column;gap:1px';
+      const nameSpan = document.createElement('span');
+      nameSpan.textContent = supporter.first + ' ' + supporter.last;
+      const roleSpan = document.createElement('span');
+      roleSpan.style.cssText = 'font-size:10px;color:var(--text-muted)';
+      roleSpan.textContent = supporter.role + (supporter.id.startsWith('nh_') ? ' · incoming' : '');
+      l.appendChild(nameSpan); l.appendChild(roleSpan);
+      item.appendChild(cb); item.appendChild(l);
+      section.appendChild(item);
+    });
+  }
+  containerEl.appendChild(section);
+}
+
+function applyPendingUpdates(pendingUpdates) {
+  pendingUpdates.forEach(u => {
+    if (u.supporterId.startsWith('nh_')) {
+      const evId = u.supporterId.slice(3);
+      const sEv = state.events.find(x => x.id === evId);
+      if (sEv) {
+        if (!sEv.supportsIds) sEv.supportsIds = [];
+        if (u.add && !sEv.supportsIds.includes(u.personId)) sEv.supportsIds.push(u.personId);
+        if (!u.add) sEv.supportsIds = sEv.supportsIds.filter(id => id !== u.personId);
+      }
+    } else {
+      const sp = state.people.find(x => x.id === u.supporterId);
+      if (sp) {
+        if (!sp.supportsIds) sp.supportsIds = [];
+        if (u.add && !sp.supportsIds.includes(u.personId)) sp.supportsIds.push(u.personId);
+        if (!u.add) sp.supportsIds = sp.supportsIds.filter(id => id !== u.personId);
+      }
+    }
+  });
+}
+
 // Builds (or rebuilds) the "Supports" checkbox section inside the person modal.
 function buildPersonSupportsUI(person, containerEl) {
   containerEl.innerHTML = '';
@@ -2332,7 +2573,8 @@ function buildPersonSupportsUI(person, containerEl) {
     warn.textContent = 'Select a team above to see support options.';
     supportList.appendChild(warn);
   } else {
-    const advisors = state.people.filter(p =>
+    const visiblePeople = getVisiblePeople();
+    const advisors = visiblePeople.filter(p =>
       ['SA', 'LFA', 'FA'].includes(p.role) && p.team === person.team && p.id !== person.id
     );
     if (advisors.length === 0) {
@@ -2356,7 +2598,7 @@ function buildPersonSupportsUI(person, containerEl) {
           }
         };
         const l = document.createElement('label');
-        l.textContent = ad.first + ' ' + ad.last + ' (' + ad.role + ')';
+        l.textContent = ad.first + ' ' + ad.last + ' (' + ad.role + (ad.id.startsWith('nh_') ? ' · incoming' : '') + ')';
         item.appendChild(cb);
         item.appendChild(l);
         supportList.appendChild(item);
@@ -2397,7 +2639,8 @@ function buildEventSupportsUI(event, containerEl) {
     return;
   }
 
-  const advisors = state.people.filter(p =>
+  const visiblePeople = getVisiblePeople();
+  const advisors = visiblePeople.filter(p =>
     ['SA', 'LFA', 'FA'].includes(p.role) && p.team === event.toTeam
   );
 
@@ -2424,8 +2667,7 @@ function buildEventSupportsUI(event, containerEl) {
       };
       const lbl2 = document.createElement('label');
       lbl2.htmlFor = 'esup_' + ad.id;
-      const teamLabel = isCS ? ` · ${ad.team}` : '';
-      lbl2.textContent = `${ad.first} ${ad.last} (${ad.role}${teamLabel})`;
+      lbl2.textContent = `${ad.first} ${ad.last} (${ad.role}${ad.id.startsWith('nh_') ? ' · incoming' : ''})`;
       item.appendChild(cb);
       item.appendChild(lbl2);
       supportList.appendChild(item);
