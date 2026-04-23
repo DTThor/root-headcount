@@ -759,7 +759,12 @@ function getVisiblePeople() {
     else if (ev.type === 'return') p.status = 'active';
     else if (ev.type === 'departure') { visible.splice(visible.indexOf(p), 1); }
     else if (ev.type === 'promotion') { p.role = ev.toRole; if (ev.toTeam) p.team = ev.toTeam; }
-    else if (ev.type === 'team_move') p.team = ev.toTeam;
+    else if (ev.type === 'team_move') {
+      p.team = ev.toTeam;
+      // Clear old support relationships — they belong to the previous team.
+      // Use event's supportsIds if explicitly set, otherwise reset to unassigned.
+      p.supportsIds = (ev.supportsIds && ev.supportsIds.length > 0) ? ev.supportsIds : [];
+    }
   });
   return visible;
 }
@@ -1551,6 +1556,26 @@ function renderRoleGrid(el, team, people, allPeople) {
   }
 
   el.appendChild(grid);
+
+  // Unassigned AFAs — those whose supportsIds don't resolve to any pod leader on this team
+  const gridPodLeaderIds = new Set(orderedLeaders.map(pl => pl.id));
+  const gridUnassignedAfas = afas.filter(a => {
+    const podId = resolvedPodIdForTarget(a.id);
+    return !podId || !gridPodLeaderIds.has(podId);
+  });
+  if (gridUnassignedAfas.length > 0) {
+    const unassignedWrap = document.createElement('div');
+    unassignedWrap.style.cssText = 'margin-top:12px;background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden';
+    const unassignedHdr = document.createElement('div');
+    unassignedHdr.style.cssText = 'padding:7px 14px;font-size:11px;font-weight:700;color:var(--text-muted);background:var(--surface2);border-bottom:1px solid var(--border)';
+    unassignedHdr.textContent = 'Unassigned — No Pod';
+    unassignedWrap.appendChild(unassignedHdr);
+    const unassignedRow = document.createElement('div');
+    unassignedRow.style.cssText = 'display:flex;flex-wrap:wrap;gap:8px;padding:10px 14px';
+    gridUnassignedAfas.forEach(a => unassignedRow.appendChild(personChip(a, 36)));
+    unassignedWrap.appendChild(unassignedRow);
+    el.appendChild(unassignedWrap);
+  }
 }
 
 // ── Support View Layout ───────────────────────────────────────────────────────
@@ -1766,6 +1791,41 @@ function renderSupportViewLayout(el, team, people, allPeople) {
     group.forEach(pl => podsRow.appendChild(buildPodCard(pl)));
     noCs.appendChild(podsRow);
     svEl.appendChild(noCs);
+  }
+
+  // Unassigned AFAs — those whose supportsIds don't resolve to any pod leader on this team
+  const podLeaderIds = new Set(podLeaders.map(pl => pl.id));
+  const unassignedAfas = afas.filter(a => {
+    const podId = resolvedPodIdForTarget(a.id);
+    return !podId || !podLeaderIds.has(podId);
+  });
+  if (unassignedAfas.length > 0) {
+    const unassignedSection = document.createElement('div');
+    unassignedSection.className = 'sv-no-cs-group';
+    const unassignedLbl = document.createElement('div');
+    unassignedLbl.className = 'sv-no-cs-label';
+    unassignedLbl.textContent = 'Unassigned';
+    unassignedSection.appendChild(unassignedLbl);
+    const unassignedRow = document.createElement('div');
+    unassignedRow.className = 'sv-cs-group-pods';
+    unassignedAfas.forEach(a => {
+      const chip = document.createElement('div');
+      chip.className = 'sv-leader-chip' + (a.status === 'leave' ? ' sv-leave' : '');
+      chip.style.cssText = 'cursor:pointer;width:auto;min-width:80px;opacity:0.8';
+      chip.onclick = () => openPersonModal(a.id);
+      const arc = ROLE_COLORS[a.role];
+      chip.appendChild(avatarEl(a, 36, arc.bg, arc.text, (a.first[0]+a.last[0]).toUpperCase(), false));
+      const cn = document.createElement('div'); cn.className = 'sv-leader-name'; cn.textContent = a.first + ' ' + a.last;
+      const cr = document.createElement('div'); cr.className = 'sv-role-badge'; cr.style.background = arc.bg; cr.style.color = arc.text; cr.textContent = a.role;
+      chip.appendChild(cn); chip.appendChild(cr);
+      const noTeamTag = document.createElement('div');
+      noTeamTag.style.cssText = 'font-size:8px;font-weight:700;padding:1px 6px;border-radius:8px;background:#f0f0f0;color:#888;border:1px solid #ddd;margin-top:2px;white-space:nowrap';
+      noTeamTag.textContent = 'No pod';
+      chip.appendChild(noTeamTag);
+      unassignedRow.appendChild(chip);
+    });
+    unassignedSection.appendChild(unassignedRow);
+    svEl.appendChild(unassignedSection);
   }
 
   // CS people section at bottom
