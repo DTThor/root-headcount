@@ -2762,7 +2762,13 @@ function buildPersonSupportsUI(person, containerEl) {
 function buildEventSupportsUI(event, containerEl) {
   containerEl.innerHTML = '';
   const AFA_CS_ROLES = new Set(['AFA2', 'AFA1', 'CSA', 'CSC']);
-  if (!AFA_CS_ROLES.has(event.toRole)) {
+  // For team_move events, derive the effective role from the person being moved
+  let effectiveRole = event.toRole;
+  if (event.type === 'team_move' && event.personId) {
+    const mover = state.people.find(p => p.id === event.personId);
+    if (mover) effectiveRole = mover.role;
+  }
+  if (!AFA_CS_ROLES.has(effectiveRole)) {
     containerEl.style.display = 'none';
     return;
   }
@@ -2832,6 +2838,8 @@ function rebuildEventSupportsSection(event, container, pendingUpdates) {
     buildSupportedByUI('nh_' + event.id, event.toTeam, container, pendingUpdates);
   } else {
     buildEventSupportsUI(event, container);
+    // For team_move, only show if a destination team is selected
+    if (event.type === 'team_move' && !event.toTeam) container.innerHTML = '';
   }
 }
 
