@@ -758,7 +758,18 @@ function getVisiblePeople() {
     if (ev.type === 'on_leave') p.status = 'leave';
     else if (ev.type === 'return') p.status = 'active';
     else if (ev.type === 'departure') { visible.splice(visible.indexOf(p), 1); }
-    else if (ev.type === 'promotion') { p.role = ev.toRole; if (ev.toTeam) p.team = ev.toTeam; }
+    else if (ev.type === 'promotion') {
+      p.role = ev.toRole;
+      if (ev.toTeam) {
+        p.team = ev.toTeam;
+        // Team changed — clear old support relationships and use event's if set
+        p.supportsIds = (ev.supportsIds && ev.supportsIds.length > 0) ? [...ev.supportsIds] : [];
+      } else if (ev.supportsIds && ev.supportsIds.length > 0) {
+        // Same team, but new support relationships specified in the event
+        p.supportsIds = [...ev.supportsIds];
+      }
+      // Same team + no supportsIds on event → keep existing
+    }
     else if (ev.type === 'team_move') {
       p.team = ev.toTeam;
       // Clear old support relationships — they belong to the previous team.
@@ -1880,6 +1891,20 @@ function openPersonModal(personId) {
     const ev = state.events.find(e => e.id === eventId);
     if (ev) openProjectedPersonModal(ev);
     return;
+  }
+  // In projected view, if this person has a promotion or team_move event applied,
+  // open that event for editing instead of their current-state modal
+  if (currentView === 'projected') {
+    const cutoffStr = document.getElementById('proj-date')?.value || new Date().toISOString().split('T')[0];
+    const projEvent = state.events.find(ev =>
+      ev.personId === personId &&
+      ev.date && ev.date <= cutoffStr &&
+      (ev.type === 'promotion' || ev.type === 'team_move')
+    );
+    if (projEvent) {
+      editEvent(projEvent.id);
+      return;
+    }
   }
   let person = state.people.find(p => p.id === personId);
   if (!person) {
