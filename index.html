@@ -1449,7 +1449,7 @@ function renderRoleGrid(el, team, people, allPeople) {
           slot.style.cssText = 'width:36px;height:36px;font-size:18px';
           slot.title = 'Add ' + role;
           slot.textContent = '+';
-          slot.onclick = () => openAddPersonModal({ role, team, supportsIds: [pl.id] });
+          slot.onclick = () => openAddEventModal({ type: 'new_hire', toRole: role, toTeam: team, supportsIds: [pl.id] });
           cell.appendChild(slot);
         }
       } else {
@@ -1564,7 +1564,7 @@ function renderSupportViewLayout(el, team, people, allPeople) {
     if (podAfas.length === 0) {
       const slot = document.createElement('div'); slot.className = 'sv-empty-slot';
       slot.title = 'Add AFA'; slot.textContent = '+';
-      slot.onclick = () => openAddPersonModal({ role: 'AFA2', team, supportsIds: [pl.id] });
+      slot.onclick = () => openAddEventModal({ type: 'new_hire', toRole: 'AFA2', toTeam: team, supportsIds: [pl.id] });
       memberGroup.appendChild(slot);
     } else {
       podAfas.forEach(a => {
@@ -2673,7 +2673,19 @@ function buildEventSupportsUI(event, containerEl) {
   containerEl.appendChild(supportList);
 }
 
-function openAddEventModal() {
+// Rebuilds the dynamic supports/supported-by container inside an event modal.
+// Only shows "Supported By" for new_hire events where the role is SA/LFA/FA.
+function rebuildEventSupportsSection(event, container, pendingUpdates) {
+  container.innerHTML = '';
+  pendingUpdates.length = 0;
+  if (event.type === 'new_hire' && ['SA','LFA','FA'].includes(event.toRole) && event.toTeam) {
+    buildSupportedByUI('nh_' + event.id, event.toTeam, container, pendingUpdates);
+  } else {
+    buildEventSupportsUI(event, container);
+  }
+}
+
+function openAddEventModal(defaults = {}) {
   const modalRoot = document.getElementById('modal-root');
   const overlay = document.createElement('div');
   overlay.className = 'overlay';
@@ -2696,7 +2708,7 @@ function openAddEventModal() {
   const body = document.createElement('div');
   body.className = 'modal-body';
 
-  const event = { id: 'e_' + Date.now(), type: 'promotion', date: new Date().toISOString().split('T')[0], notes: '', personId: null, newFirst: '', newLast: '', toRole: 'FA', toTeam: '', supportsIds: [] };
+  const event = { id: 'e_' + Date.now(), type: defaults.type || 'new_hire', date: new Date().toISOString().split('T')[0], notes: '', personId: null, newFirst: '', newLast: '', toRole: defaults.toRole || 'AFA2', toTeam: defaults.toTeam || '', supportsIds: defaults.supportsIds ? [...defaults.supportsIds] : [] };
 
   const fg1 = document.createElement('div');
   fg1.className = 'fg';
@@ -2711,7 +2723,8 @@ function openAddEventModal() {
     opt.textContent = et.label;
     fs1.appendChild(opt);
   });
-  fs1.onchange = (e) => { event.type = e.target.value; };
+  fs1.value = event.type;
+  fs1.onchange = (e) => { event.type = e.target.value; rebuildEventSupportsSection(event, fgSupports, pendingUpdates); };
   fg1.appendChild(l1);
   fg1.appendChild(fs1);
   body.appendChild(fg1);
@@ -2796,7 +2809,7 @@ function openAddEventModal() {
   fs6.value = event.toRole;
   fs6.onchange = (e) => {
     event.toRole = e.target.value;
-    buildEventSupportsUI(event, fgSupports);
+    rebuildEventSupportsSection(event, fgSupports, pendingUpdates);
   };
   fg6.appendChild(l6);
   fg6.appendChild(fs6);
@@ -2819,17 +2832,19 @@ function openAddEventModal() {
     opt.textContent = t;
     fs7.appendChild(opt);
   });
+  fs7.value = event.toTeam;
   fs7.onchange = (e) => {
     event.toTeam = e.target.value;
-    buildEventSupportsUI(event, fgSupports);
+    rebuildEventSupportsSection(event, fgSupports, pendingUpdates);
   };
   fg7.appendChild(l7);
   fg7.appendChild(fs7);
   body.appendChild(fg7);
 
-  // Supports section — shown dynamically for AFA/CS roles
+  // Supports / Supported By section — shown dynamically based on role
+  const pendingUpdates = [];
   const fgSupports = document.createElement('div');
-  buildEventSupportsUI(event, fgSupports);
+  rebuildEventSupportsSection(event, fgSupports, pendingUpdates);
   body.appendChild(fgSupports);
 
   const fg8 = document.createElement('div');
@@ -2853,6 +2868,7 @@ function openAddEventModal() {
   saveBtn.className = 'btn-primary';
   saveBtn.textContent = 'Save';
   saveBtn.onclick = () => {
+    applyPendingUpdates(pendingUpdates);
     state.events.push(event);
     saveState();
     render();
@@ -3004,7 +3020,7 @@ function editEvent(eventId) {
   fs6.value = event.toRole;
   fs6.onchange = (e) => {
     event.toRole = e.target.value;
-    buildEventSupportsUI(event, fgSupportsEdit);
+    rebuildEventSupportsSection(event, fgSupportsEdit, pendingUpdatesEdit);
   };
   fg6.appendChild(l6);
   fg6.appendChild(fs6);
@@ -3030,15 +3046,16 @@ function editEvent(eventId) {
   fs7.value = event.toTeam;
   fs7.onchange = (e) => {
     event.toTeam = e.target.value;
-    buildEventSupportsUI(event, fgSupportsEdit);
+    rebuildEventSupportsSection(event, fgSupportsEdit, pendingUpdatesEdit);
   };
   fg7.appendChild(l7);
   fg7.appendChild(fs7);
   body.appendChild(fg7);
 
-  // Supports section — shown dynamically for AFA/CS roles, pre-populated from event data
+  // Supports / Supported By section — shown dynamically based on role
+  const pendingUpdatesEdit = [];
   const fgSupportsEdit = document.createElement('div');
-  buildEventSupportsUI(event, fgSupportsEdit);
+  rebuildEventSupportsSection(event, fgSupportsEdit, pendingUpdatesEdit);
   body.appendChild(fgSupportsEdit);
 
   const fg8 = document.createElement('div');
@@ -3072,6 +3089,7 @@ function editEvent(eventId) {
   saveBtn.className = 'btn-primary';
   saveBtn.textContent = 'Save';
   saveBtn.onclick = () => {
+    applyPendingUpdates(pendingUpdatesEdit);
     const isNew = !state.events.find(e => e.id === eventId);
     const idx = state.events.findIndex(e => e.id === eventId);
     if (idx >= 0) state.events[idx] = event;
