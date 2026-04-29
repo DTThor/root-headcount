@@ -532,11 +532,12 @@ const AUM_THRESHOLDS = { LFA: 50, FA: 10 };
 
 const PROMO_CRITERIA = {
   'AFA2→FA': [
-    { key:'cfp_exam',      label:'CFP® exam passed' },
-    { key:'months_12',     label:'12+ months in advisory role' },
-    { key:'mock_sequoia',  label:'Mock Sequoia Assessment passed (Paul Layton)' },
-    { key:'sa_signoff',    label:'Senior Advisor sign-off received' },
-    { key:'client_commit', label:'Committed to 1 client/month' },
+    { key:'cfp_exam',        label:'CFP® exam passed' },
+    { key:'months_12',       label:'12+ months in advisory role' },
+    { key:'mock_sequoia',    label:'Mock Sequoia Assessment passed (Paul Layton)' },
+    { key:'sa_signoff',      label:'Senior Advisor sign-off received' },
+    { key:'client_commit',   label:'Committed to 1 client/month' },
+    { key:'invest_capstone', label:'Investment Capstone completed' },
   ],
   'FA→LFA': [
     { key:'cfp_cert',          label:'CFP® certification complete' },
@@ -2209,7 +2210,9 @@ function openPersonModal(personId) {
       return;
     }
   }
-  let person = state.people.find(p => p.id === personId);
+  // Load from the visible (event-applied) state so the modal reflects what the team views show
+  const _visiblePeople = getVisiblePeople();
+  let person = _visiblePeople.find(p => p.id === personId) || state.people.find(p => p.id === personId);
   if (!person) {
     alert('Person not found');
     return;
@@ -2561,6 +2564,22 @@ function openPersonModal(personId) {
       if (!state.photoOverrides) state.photoOverrides = {};
       state.photoOverrides[person.id] = pendingPhoto;
     }
+    // Sync any applied promotion/team_move event so getVisiblePeople() stays idempotent.
+    // Without this, the event would re-override edits made here (role, team, supportsIds).
+    const _cutoffNow = currentView === 'current'
+      ? new Date().toISOString().split('T')[0]
+      : (document.getElementById('proj-date')?.value || new Date().toISOString().split('T')[0]);
+    const _appliedEvIdx = state.events.findIndex(ev =>
+      ev.personId === personId &&
+      ev.date && ev.date <= _cutoffNow &&
+      (ev.type === 'promotion' || ev.type === 'team_move')
+    );
+    if (_appliedEvIdx >= 0) {
+      const _ev = state.events[_appliedEvIdx];
+      if (_ev.type === 'promotion') _ev.toRole = person.role;
+      _ev.toTeam = person.team;
+      _ev.supportsIds = [...(person.supportsIds || [])];
+    }
     saveState();
     render();
     modalRoot.innerHTML = '';
@@ -2607,7 +2626,12 @@ function openPersonModal(personId) {
 // ── Projected New Hire Edit Modal ─────────────────────────────────────────────
 function openProjectedPersonModal(ev) {
   const event = JSON.parse(JSON.stringify(ev));
+  if (!event.criteria) event.criteria = {};
+  if (event.aum === undefined) event.aum = null;
   const personId = 'nh_' + ev.id;
+
+  const todayStr = new Date().toISOString().split('T')[0];
+  const hasStarted = event.date && event.date <= todayStr;
 
   const modalRoot = document.getElementById('modal-root');
   const overlay = document.createElement('div');
@@ -2615,17 +2639,20 @@ function openProjectedPersonModal(ev) {
   const modal = document.createElement('div');
   modal.className = 'modal';
 
+  // Header
   const header = document.createElement('div');
   header.className = 'modal-hdr';
   const titleWrap = document.createElement('div');
   titleWrap.style.cssText = 'display:flex;align-items:center;gap:8px';
   const title = document.createElement('h3');
   title.textContent = (event.newFirst || event.newLast) ? (event.newFirst + ' ' + event.newLast).trim() : 'Incoming Person';
-  const badge = document.createElement('span');
-  badge.style.cssText = 'font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;background:#cce5ff;color:#004085';
-  badge.textContent = 'Incoming';
   titleWrap.appendChild(title);
-  titleWrap.appendChild(badge);
+  if (!hasStarted) {
+    const incomingBadge = document.createElement('span');
+    incomingBadge.style.cssText = 'font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;background:#cce5ff;color:#004085';
+    incomingBadge.textContent = 'Incoming';
+    titleWrap.appendChild(incomingBadge);
+  }
   header.appendChild(titleWrap);
   const closeBtn = document.createElement('button');
   closeBtn.className = 'modal-close';
@@ -2637,18 +2664,75 @@ function openProjectedPersonModal(ev) {
   const body = document.createElement('div');
   body.className = 'modal-body';
 
+  // ── Photo upload ──────────────────────────────────────────────────────────
+  const rc0 = ROLE_COLORS[event.toRole] || { bg:'#888', text:'#fff' };
+  const initials0 = ((event.newFirst||'?')[0] + (event.newLast||'?')[0]).toUpperCase();
+  const photoWrap = document.createElement('div');
+  photoWrap.className = 'photo-upload-wrap';
+  const photoAvatar = document.createElement('div');
+  photoAvatar.className = 'photo-upload-avatar';
+  photoAvatar.title = 'Click to change photo';
+  let pendingPhoto = null;
+  let removeBtn;
+
+  function rebuildPhotoAvatar() {
+    const existingInput = photoAvatar.querySelector('input[type=file]');
+    photoAvatar.innerHTML = '';
+    let currentSrc;
+    if (pendingPhoto === 'remove') { currentSrc = null; }
+    else if (pendingPhoto) { currentSrc = pendingPhoto; }
+    else { currentSrc = state.photoOverrides && state.photoOverrides[personId]; }
+    if (currentSrc) {
+      const img = document.createElement('img'); img.src = currentSrc;
+      img.alt = (event.newFirst || '') + ' ' + (event.newLast || '');
+      photoAvatar.appendChild(img);
+    } else {
+      const ini = document.createElement('div'); ini.className = 'photo-initials';
+      ini.style.cssText = `background:${rc0.bg};color:${rc0.text};width:80px;height:80px;border-radius:50%`;
+      ini.textContent = initials0; photoAvatar.appendChild(ini);
+    }
+    const ovl = document.createElement('div'); ovl.className = 'photo-upload-overlay';
+    ovl.innerHTML = `<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>`;
+    photoAvatar.appendChild(ovl);
+    if (existingInput) photoAvatar.appendChild(existingInput);
+    if (removeBtn) removeBtn.style.display = (state.photoOverrides && state.photoOverrides[personId] || (pendingPhoto && pendingPhoto !== 'remove')) ? '' : 'none';
+  }
+
+  const fileInput = document.createElement('input');
+  fileInput.type = 'file'; fileInput.accept = 'image/*'; fileInput.style.display = 'none';
+  fileInput.onchange = (e) => {
+    const file = e.target.files[0]; if (!file) return;
+    resizeImageToBase64(file, 128, 0.88, (base64) => { pendingPhoto = base64; rebuildPhotoAvatar(); });
+    fileInput.value = '';
+  };
+  photoAvatar.appendChild(fileInput);
+  photoAvatar.onclick = () => fileInput.click();
+
+  removeBtn = document.createElement('button');
+  removeBtn.className = 'photo-remove-btn'; removeBtn.type = 'button'; removeBtn.textContent = 'Remove photo';
+  removeBtn.style.display = 'none';
+  removeBtn.onclick = (e) => { e.stopPropagation(); pendingPhoto = 'remove'; rebuildPhotoAvatar(); };
+
+  const photoLabel = document.createElement('label');
+  photoLabel.className = 'photo-upload-label'; photoLabel.textContent = 'Click to change photo';
+  photoLabel.onclick = () => fileInput.click();
+
+  rebuildPhotoAvatar();
+  photoWrap.appendChild(photoAvatar); photoWrap.appendChild(photoLabel); photoWrap.appendChild(removeBtn);
+  body.appendChild(photoWrap);
+
   // Name row
   const frow = document.createElement('div');
   frow.className = 'frow';
   const fg1 = document.createElement('div'); fg1.className = 'fg';
   const l1 = document.createElement('label'); l1.className = 'fl'; l1.textContent = 'First Name';
   const fi1 = document.createElement('input'); fi1.className = 'fi'; fi1.type = 'text'; fi1.value = event.newFirst || '';
-  fi1.oninput = (e) => { event.newFirst = e.target.value; };
+  fi1.oninput = (e) => { event.newFirst = e.target.value; title.textContent = (event.newFirst + ' ' + event.newLast).trim() || 'Incoming Person'; };
   fg1.appendChild(l1); fg1.appendChild(fi1); frow.appendChild(fg1);
   const fg2 = document.createElement('div'); fg2.className = 'fg';
   const l2 = document.createElement('label'); l2.className = 'fl'; l2.textContent = 'Last Name';
   const fi2 = document.createElement('input'); fi2.className = 'fi'; fi2.type = 'text'; fi2.value = event.newLast || '';
-  fi2.oninput = (e) => { event.newLast = e.target.value; };
+  fi2.oninput = (e) => { event.newLast = e.target.value; title.textContent = (event.newFirst + ' ' + event.newLast).trim() || 'Incoming Person'; };
   fg2.appendChild(l2); fg2.appendChild(fi2); frow.appendChild(fg2);
   body.appendChild(frow);
 
@@ -2658,7 +2742,7 @@ function openProjectedPersonModal(ev) {
   const fs3 = document.createElement('select'); fs3.className = 'fs';
   ROLES.forEach(r => { const opt = document.createElement('option'); opt.value = r; opt.textContent = ROLE_LABELS[r] || r; fs3.appendChild(opt); });
   fs3.value = event.toRole || 'AFA2';
-  fs3.onchange = (e) => { event.toRole = e.target.value; rebuildSupportsSection(); };
+  fs3.onchange = (e) => { event.toRole = e.target.value; rebuildSupportsSection(); rebuildCriteriaSection(); };
   fg3.appendChild(l3); fg3.appendChild(fs3); body.appendChild(fg3);
 
   // Team
@@ -2700,6 +2784,51 @@ function openProjectedPersonModal(ev) {
   }
   rebuildSupportsSection();
 
+  // AUM (for LFA/FA)
+  const aumContainer = document.createElement('div');
+  body.appendChild(aumContainer);
+  function rebuildAumSection() {
+    aumContainer.innerHTML = '';
+    if (!['LFA','FA'].includes(event.toRole)) return;
+    const fg8 = document.createElement('div'); fg8.className = 'fg';
+    const l8 = document.createElement('label'); l8.className = 'fl'; l8.textContent = 'AUM ($M, billed)';
+    const fi8 = document.createElement('input'); fi8.className = 'fi'; fi8.type = 'number'; fi8.step = '0.1';
+    fi8.placeholder = 'Enter AUM in millions'; fi8.value = event.aum !== null ? event.aum : '';
+    fi8.onchange = (e) => { event.aum = e.target.value ? parseFloat(e.target.value) : null; };
+    const aumNote = document.createElement('div');
+    aumNote.style.cssText = 'font-size:11px;color:var(--text-muted);margin-top:4px';
+    const threshold = AUM_THRESHOLDS[event.toRole];
+    aumNote.textContent = '$' + threshold + 'M = qualifies for ' + (event.toRole === 'LFA' ? 'dedicated AFA' : 'FA→LFA milestone');
+    fg8.appendChild(l8); fg8.appendChild(fi8); fg8.appendChild(aumNote);
+    aumContainer.appendChild(fg8);
+  }
+  rebuildAumSection();
+
+  // Promotion criteria (dynamic — re-renders when role changes)
+  const criteriaContainer = document.createElement('div');
+  body.appendChild(criteriaContainer);
+  function rebuildCriteriaSection() {
+    criteriaContainer.innerHTML = '';
+    rebuildAumSection();
+    const critKey = event.toRole === 'AFA2' ? 'AFA2→FA' : event.toRole === 'FA' ? 'FA→LFA' : null;
+    if (!critKey) return;
+    const crits = PROMO_CRITERIA[critKey];
+    const critSection = document.createElement('div'); critSection.className = 'criteria-section';
+    const critTitle = document.createElement('div'); critTitle.className = 'criteria-title';
+    critTitle.textContent = critKey + ' Criteria';
+    critSection.appendChild(critTitle);
+    crits.forEach(crit => {
+      const item = document.createElement('div'); item.className = 'criteria-item';
+      const cb = document.createElement('input'); cb.type = 'checkbox';
+      cb.checked = event.criteria[crit.key] || false;
+      cb.onchange = (e) => { if (e.target.checked) { event.criteria[crit.key] = true; } else { delete event.criteria[crit.key]; } };
+      const lbl = document.createElement('label'); lbl.textContent = crit.label;
+      item.appendChild(cb); item.appendChild(lbl); critSection.appendChild(item);
+    });
+    criteriaContainer.appendChild(critSection);
+  }
+  rebuildCriteriaSection();
+
   modal.appendChild(body);
 
   const footer = document.createElement('div');
@@ -2721,6 +2850,14 @@ function openProjectedPersonModal(ev) {
     applyPendingUpdates(pendingUpdates);
     const idx = state.events.findIndex(e => e.id === ev.id);
     if (idx >= 0) state.events[idx] = event;
+    // Apply pending photo change
+    if (pendingPhoto === 'remove') {
+      if (!state.photoOverrides) state.photoOverrides = {};
+      delete state.photoOverrides[personId];
+    } else if (pendingPhoto) {
+      if (!state.photoOverrides) state.photoOverrides = {};
+      state.photoOverrides[personId] = pendingPhoto;
+    }
     saveState(); render();
     modalRoot.innerHTML = ''; modalRoot.style.display = 'none';
   };
