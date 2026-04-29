@@ -355,6 +355,21 @@ body { font-family: 'Sailec', -apple-system, BlinkMacSystemFont, sans-serif; bac
   .mob-team-chip.active { background: #33342C; color: white; border-color: #33342C; }
 }
 
+/* ── Photo Upload ─────────────────────────────────────────────────────────── */
+.photo-upload-wrap { display:flex; flex-direction:column; align-items:center; gap:8px; padding: 14px 0 10px; border-bottom: 1px solid var(--border); margin-bottom: 12px; }
+.photo-upload-avatar { position:relative; width:80px; height:80px; cursor:pointer; }
+.photo-upload-avatar img,
+.photo-upload-avatar .photo-initials { width:80px; height:80px; border-radius:50%; object-fit:cover; display:block; }
+.photo-initials { display:flex; align-items:center; justify-content:center; font-size:28px; font-weight:700; }
+.photo-upload-overlay { position:absolute; inset:0; border-radius:50%; background:rgba(0,0,0,0); display:flex; align-items:center; justify-content:center; transition:background 0.18s; }
+.photo-upload-avatar:hover .photo-upload-overlay { background:rgba(0,0,0,0.42); }
+.photo-upload-overlay svg { opacity:0; transition:opacity 0.18s; }
+.photo-upload-avatar:hover .photo-upload-overlay svg { opacity:1; }
+.photo-upload-label { font-size:11px; color:var(--text-muted); cursor:pointer; }
+.photo-upload-label:hover { color:var(--accent); }
+.photo-remove-btn { font-size:10px; color:#c0392b; background:none; border:none; cursor:pointer; padding:0; font-family:inherit; }
+.photo-remove-btn:hover { text-decoration:underline; }
+
 /* ── Needed Next Section ───────────────────────────────────────────────────── */
 .nn-section { margin-bottom: 24px; }
 .nn-header { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; }
@@ -695,6 +710,7 @@ function parseAndFixState(raw) {
       if (p.aum === undefined) p.aum = null;
     });
   }
+  if (raw && !raw.photoOverrides) raw.photoOverrides = {};
   return raw;
 }
 
@@ -717,7 +733,7 @@ async function loadState() {
     const s = localStorage.getItem('rootHeadcount_v3');
     if (s) return parseAndFixState(JSON.parse(s));
   } catch(e) {}
-  return { people: JSON.parse(JSON.stringify(INITIAL_PEOPLE)), events: JSON.parse(JSON.stringify(INITIAL_EVENTS)), lastSaved: null };
+  return { people: JSON.parse(JSON.stringify(INITIAL_PEOPLE)), events: JSON.parse(JSON.stringify(INITIAL_EVENTS)), photoOverrides: {}, lastSaved: null };
 }
 
 async function saveState() {
@@ -996,11 +1012,33 @@ function updateChangesList() {
   list.innerHTML = html || '<div class="empty-msg"><div class="eicon">📋</div>No planned changes yet</div>';
 }
 
+// ── Photo upload utility ──────────────────────────────────────────────────────
+function resizeImageToBase64(file, size, quality, callback) {
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = size;
+      canvas.height = size;
+      const ctx = canvas.getContext('2d');
+      // Center-crop square from source
+      const srcSize = Math.min(img.width, img.height);
+      const sx = (img.width - srcSize) / 2;
+      const sy = (img.height - srcSize) / 2;
+      ctx.drawImage(img, sx, sy, srcSize, srcSize, 0, 0, size, size);
+      callback(canvas.toDataURL('image/jpeg', quality));
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
 // ── Module-level rendering helpers ───────────────────────────────────────────
 function avatarEl(p, size, bg, textColor, initials, hasPromo) {
   const wrap = document.createElement('div');
   wrap.style.cssText = `position:relative;width:${size}px;height:${size}px;flex-shrink:0`;
-  const src = PHOTO_DATA[p.id];
+  const src = (state.photoOverrides && state.photoOverrides[p.id]) || PHOTO_DATA[p.id];
   let inner;
   if (src) {
     inner = document.createElement('img');
@@ -1186,33 +1224,69 @@ function computeNeededNext(allPeople) {
     }
   });
 
-  // ── Trigger 3: Planned AFA→FA promotion leaves LFA without AFA coverage ──
-  const afaToFaEvents = state.events.filter(ev => {
-    if (ev.type !== 'promotion' || ev.toRole !== 'FA') return false;
+  // ── Trigger 3: Any planned event that removes an AFA from a pod, leaving an LFA without AFA ──
+  // Covers: promotion out of AFA role, team move to a different team, departure
+  const afaDisruptiveEvents = state.events.filter(ev => {
+    if (!ev.personId) return false;
     const person = state.people.find(p => p.id === ev.personId);
-    return person && ['AFA2','AFA1'].includes(person.role);
+    if (!person || !['AFA2','AFA1'].includes(person.role)) return false;
+    if (ev.type === 'departure') return true;
+    if (ev.type === 'promotion' && !['AFA2','AFA1'].includes(ev.toRole)) return true;
+    if (ev.type === 'team_move') return true;
+    return false;
   });
-  afaToFaEvents.forEach(ev => {
-    const promoted = state.people.find(p => p.id === ev.personId);
-    if (!promoted) return;
-    const supportedLFAs = (promoted.supportsIds || [])
+
+  // Track which (afa, lfa) pairs we've already flagged to avoid duplicates
+  const flaggedAfaLfaPairs = new Set();
+
+  afaDisruptiveEvents.forEach(ev => {
+    const afa = state.people.find(p => p.id === ev.personId);
+    if (!afa) return;
+
+    // Find LFAs this AFA currently supports
+    const supportedLFAs = (afa.supportsIds || [])
       .map(id => state.people.find(p => p.id === id))
       .filter(p => p && p.role === 'LFA');
-    supportedLFAs.forEach(lfa => {
+
+    // For team moves, only flag LFAs that would be left on the old team
+    const lfasLosingSuppport = ev.type === 'team_move'
+      ? supportedLFAs.filter(lfa => lfa.team !== ev.toTeam)
+      : supportedLFAs;
+
+    lfasLosingSuppport.forEach(lfa => {
+      const pairKey = `${afa.id}:${lfa.id}`;
+      if (flaggedAfaLfaPairs.has(pairKey)) return;
+
+      // Check if any OTHER AFA currently supports this LFA (ignoring the departing AFA)
       const otherAfas = state.people.filter(p =>
-        p.id !== promoted.id &&
+        p.id !== afa.id &&
         ['AFA2','AFA1'].includes(p.role) &&
         (p.supportsIds || []).includes(lfa.id)
       );
       if (otherAfas.length === 0) {
+        flaggedAfaLfaPairs.add(pairKey);
+
+        // Build a human-readable reason
+        let reason, ruleText;
+        if (ev.type === 'promotion') {
+          reason = `${afa.first} ${afa.last}'s planned promotion to ${ev.toRole} (${ev.date})`;
+          ruleText = "Triggered when a planned AFA2/AFA1 promotion out of the AFA role would leave an LFA they support with no remaining AFA coverage.";
+        } else if (ev.type === 'team_move') {
+          reason = `${afa.first} ${afa.last}'s planned move to ${ev.toTeam} (${ev.date})`;
+          ruleText = "Triggered when a planned AFA2/AFA1 team move would leave an LFA on their current team with no remaining AFA coverage.";
+        } else {
+          reason = `${afa.first} ${afa.last}'s planned departure (${ev.date})`;
+          ruleText = "Triggered when a planned AFA2/AFA1 departure would leave an LFA they support with no remaining AFA coverage.";
+        }
+
         needs.push({
           type: 'afa_backfill',
           role: 'AFA',
           severity: 'medium',
           icon: '🔄',
-          title: `AFA backfill needed — ${lfa.first} ${lfa.last}'s pod`,
-          detail: `${promoted.first} ${promoted.last}'s planned promotion to FA (${ev.date}) will leave ${lfa.first} ${lfa.last} on ${lfa.team || 'no team'} without dedicated AFA support. An AFA2 hire is needed to fill this gap.`,
-          rule: "Triggered when a planned AFA2/AFA1→FA promotion would leave the LFA they currently support with no remaining AFA coverage."
+          title: `AFA backfill needed — ${lfa.first} ${lfa.last}'s pod (${lfa.team || 'no team'})`,
+          detail: `${reason} will leave ${lfa.first} ${lfa.last} without dedicated AFA support. An AFA2 hire is needed to fill this gap.`,
+          rule: ruleText
         });
       }
     });
@@ -1264,7 +1338,7 @@ function renderUnaffiliatedCS(el, allPeople) {
     card.className = 'pcard';
     card.onclick = () => openPersonModal(p.id);
     const rc = ROLE_COLORS[p.role];
-    const src = PHOTO_DATA[p.id];
+    const src = (state.photoOverrides && state.photoOverrides[p.id]) || PHOTO_DATA[p.id];
     const initials = (p.first[0] + (p.last[0] || '')).toUpperCase();
     const avatarHtml = src
       ? `<img src="${src}" style="width:40px;height:40px;border-radius:50%;object-fit:cover;display:block;margin-bottom:7px">`
@@ -1954,7 +2028,7 @@ function renderSupportViewLayout(el, team, people, allPeople) {
       const av = document.createElement('div');
       av.className = 'sv-cs-badge-avatar';
       av.style.background = info.color;
-      const src = PHOTO_DATA[cs.id];
+      const src = (state.photoOverrides && state.photoOverrides[cs.id]) || PHOTO_DATA[cs.id];
       if (src) {
         const img = document.createElement('img');
         img.src = src;
@@ -2126,6 +2200,94 @@ function openPersonModal(personId) {
 
   const body = document.createElement('div');
   body.className = 'modal-body';
+
+  // ── Photo upload ────────────────────────────────────────────────────────
+  const rc0 = ROLE_COLORS[person.role] || { bg:'#888', text:'#fff' };
+  const initials0 = (person.first[0] + person.last[0]).toUpperCase();
+
+  const photoWrap = document.createElement('div');
+  photoWrap.className = 'photo-upload-wrap';
+
+  const photoAvatar = document.createElement('div');
+  photoAvatar.className = 'photo-upload-avatar';
+  photoAvatar.title = 'Click to change photo';
+
+  // pendingPhoto tracks unsaved changes: null = no change, 'remove' = delete, or a base64 string
+  let pendingPhoto = null;
+  let removeBtn; // forward-declared so rebuildPhotoAvatar can reference it
+
+  function rebuildPhotoAvatar() {
+    const existingInput = photoAvatar.querySelector('input[type=file]');
+    photoAvatar.innerHTML = '';
+    // Show pending change if any, otherwise fall back to saved state
+    let currentSrc;
+    if (pendingPhoto === 'remove') {
+      currentSrc = null;
+    } else if (pendingPhoto) {
+      currentSrc = pendingPhoto;
+    } else {
+      currentSrc = (state.photoOverrides && state.photoOverrides[person.id]) || PHOTO_DATA[person.id];
+    }
+    if (currentSrc) {
+      const img = document.createElement('img');
+      img.src = currentSrc;
+      img.alt = person.first + ' ' + person.last;
+      photoAvatar.appendChild(img);
+    } else {
+      const ini = document.createElement('div');
+      ini.className = 'photo-initials';
+      ini.style.cssText = `background:${rc0.bg};color:${rc0.text};width:80px;height:80px;border-radius:50%`;
+      ini.textContent = initials0;
+      photoAvatar.appendChild(ini);
+    }
+    const overlay = document.createElement('div');
+    overlay.className = 'photo-upload-overlay';
+    overlay.innerHTML = `<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>`;
+    photoAvatar.appendChild(overlay);
+    if (existingInput) photoAvatar.appendChild(existingInput);
+    // Show Remove if there's a saved override OR a pending new photo (but not if pending removal)
+    const hasSavedOverride = !!(state.photoOverrides && state.photoOverrides[person.id]);
+    if (removeBtn) removeBtn.style.display = (hasSavedOverride || (pendingPhoto && pendingPhoto !== 'remove')) ? '' : 'none';
+  }
+
+  const fileInput = document.createElement('input');
+  fileInput.type = 'file';
+  fileInput.accept = 'image/*';
+  fileInput.style.display = 'none';
+  fileInput.onchange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    resizeImageToBase64(file, 128, 0.88, (base64) => {
+      pendingPhoto = base64;
+      rebuildPhotoAvatar();
+    });
+    fileInput.value = '';
+  };
+  photoAvatar.appendChild(fileInput);
+  photoAvatar.onclick = () => fileInput.click();
+
+  removeBtn = document.createElement('button');
+  removeBtn.className = 'photo-remove-btn';
+  removeBtn.type = 'button';
+  removeBtn.textContent = 'Remove photo';
+  removeBtn.style.display = 'none';
+  removeBtn.onclick = (e) => {
+    e.stopPropagation();
+    pendingPhoto = 'remove';
+    rebuildPhotoAvatar();
+  };
+
+  const photoLabel = document.createElement('label');
+  photoLabel.className = 'photo-upload-label';
+  photoLabel.textContent = 'Click to change photo';
+  photoLabel.onclick = () => fileInput.click();
+
+  rebuildPhotoAvatar(); // initial paint
+
+  photoWrap.appendChild(photoAvatar);
+  photoWrap.appendChild(photoLabel);
+  photoWrap.appendChild(removeBtn);
+  body.appendChild(photoWrap);
 
   // Name
   const frow = document.createElement('div');
@@ -2354,6 +2516,14 @@ function openPersonModal(personId) {
     applyPendingUpdates(supportedByPendingUpdates);
     const idx = state.people.findIndex(p => p.id === personId);
     if (idx >= 0) state.people[idx] = person;
+    // Apply pending photo change
+    if (pendingPhoto === 'remove') {
+      if (!state.photoOverrides) state.photoOverrides = {};
+      delete state.photoOverrides[person.id];
+    } else if (pendingPhoto) {
+      if (!state.photoOverrides) state.photoOverrides = {};
+      state.photoOverrides[person.id] = pendingPhoto;
+    }
     saveState();
     render();
     modalRoot.innerHTML = '';
@@ -2371,8 +2541,17 @@ function openPersonModal(personId) {
       modalRoot.style.display = 'none';
     }
   };
+  const cancelBtnP = document.createElement('button');
+  cancelBtnP.className = 'btn-ghost';
+  cancelBtnP.textContent = 'Cancel';
+  cancelBtnP.onclick = () => { modalRoot.innerHTML = ''; modalRoot.style.display = 'none'; };
+  footer.className = 'modal-footer spread';
+  const rightBtnsP = document.createElement('div');
+  rightBtnsP.style.cssText = 'display:flex;gap:8px';
+  rightBtnsP.appendChild(cancelBtnP);
+  rightBtnsP.appendChild(saveBtn);
   footer.appendChild(deleteBtn);
-  footer.appendChild(saveBtn);
+  footer.appendChild(rightBtnsP);
   modal.appendChild(footer);
 
   overlay.appendChild(modal);
@@ -2508,8 +2687,17 @@ function openProjectedPersonModal(ev) {
     saveState(); render();
     modalRoot.innerHTML = ''; modalRoot.style.display = 'none';
   };
+  const cancelBtnPP = document.createElement('button');
+  cancelBtnPP.className = 'btn-ghost';
+  cancelBtnPP.textContent = 'Cancel';
+  cancelBtnPP.onclick = () => { modalRoot.innerHTML = ''; modalRoot.style.display = 'none'; };
+  footer.className = 'modal-footer spread';
+  const rightBtnsPP = document.createElement('div');
+  rightBtnsPP.style.cssText = 'display:flex;gap:8px';
+  rightBtnsPP.appendChild(cancelBtnPP);
+  rightBtnsPP.appendChild(saveBtn);
   footer.appendChild(deleteBtn);
-  footer.appendChild(saveBtn);
+  footer.appendChild(rightBtnsPP);
   modal.appendChild(footer);
 
   overlay.appendChild(modal);
@@ -2577,7 +2765,7 @@ function handleSearch(query) {
       // Avatar
       const av = document.createElement('div');
       av.style.cssText = `width:32px;height:32px;border-radius:50%;flex-shrink:0;overflow:hidden;background:${rc.bg};display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:${rc.text}`;
-      const src = PHOTO_DATA[p.id];
+      const src = (state.photoOverrides && state.photoOverrides[p.id]) || PHOTO_DATA[p.id];
       if (src) {
         const img = document.createElement('img');
         img.src = src; img.style.cssText = 'width:100%;height:100%;object-fit:cover';
@@ -3252,6 +3440,11 @@ function openAddEventModal(defaults = {}) {
       modalRoot.style.display = 'none';
     }
   };
+  const cancelBtnAE = document.createElement('button');
+  cancelBtnAE.className = 'btn-ghost';
+  cancelBtnAE.textContent = 'Cancel';
+  cancelBtnAE.onclick = () => { modalRoot.innerHTML = ''; modalRoot.style.display = 'none'; };
+  footer.appendChild(cancelBtnAE);
   footer.appendChild(saveBtn);
   modal.appendChild(footer);
 
@@ -3479,8 +3672,17 @@ function editEvent(eventId) {
       modalRoot.style.display = 'none';
     }
   };
+  const cancelBtnEE = document.createElement('button');
+  cancelBtnEE.className = 'btn-ghost';
+  cancelBtnEE.textContent = 'Cancel';
+  cancelBtnEE.onclick = () => { modalRoot.innerHTML = ''; modalRoot.style.display = 'none'; };
+  footer.className = 'modal-footer spread';
+  const rightBtnsEE = document.createElement('div');
+  rightBtnsEE.style.cssText = 'display:flex;gap:8px';
+  rightBtnsEE.appendChild(cancelBtnEE);
+  rightBtnsEE.appendChild(saveBtn);
   footer.appendChild(deleteBtn);
-  footer.appendChild(saveBtn);
+  footer.appendChild(rightBtnsEE);
   modal.appendChild(footer);
 
   overlay.appendChild(modal);
