@@ -370,7 +370,14 @@ body { font-family: 'Sailec', -apple-system, BlinkMacSystemFont, sans-serif; bac
 .photo-remove-btn { font-size:10px; color:#c0392b; background:none; border:none; cursor:pointer; padding:0; font-family:inherit; }
 .photo-remove-btn:hover { text-decoration:underline; }
 
-/* ── Needed Next Section ───────────────────────────────────────────────────── */
+/* ── Overview Sub-tabs ────────────────────────────────────────────────────── */
+.ov-sub-tabs { display:flex; gap:4px; margin-bottom:18px; border-bottom:1px solid var(--border); padding-bottom:0; }
+.ov-sub-tab { padding:7px 14px; font-size:13px; font-weight:500; color:var(--text-muted); background:none; border:none; border-bottom:2px solid transparent; margin-bottom:-1px; cursor:pointer; display:flex; align-items:center; gap:6px; transition:color 0.15s, border-color 0.15s; border-radius:0; }
+.ov-sub-tab:hover { color:var(--text); }
+.ov-sub-tab.active { color:var(--text); border-bottom-color:var(--accent); font-weight:600; }
+.ov-sub-tab-badge { font-size:10px; font-weight:700; padding:1px 6px; border-radius:10px; background:#e74c3c; color:white; }
+
+/* ── Upcoming (fka Needed Next) Section ──────────────────────────────────── */
 .nn-section { margin-bottom: 24px; }
 .nn-header { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; }
 .nn-title { font-size: 15px; font-weight: 700; color: var(--text); }
@@ -700,6 +707,7 @@ const _supabase = (typeof supabase !== 'undefined')
 let state = { people: [], events: [] }; // populated async in init()
 let currentView = 'current';
 let currentTab = 'overview';
+let overviewSubTab = 'overview'; // 'overview' | 'upcoming'
 let teamViewMode = 'support'; // global: 'support' or 'role', shared across all teams
 
 function parseAndFixState(raw) {
@@ -862,6 +870,7 @@ function setMobileTab(tab) {
 
 function setTab(tab) {
   currentTab = tab;
+  if (tab !== 'overview') overviewSubTab = 'overview'; // reset sub-tab when leaving overview
   document.querySelectorAll('.nav-item').forEach(n => n.classList.toggle('active', n.dataset.tab === tab));
   // Sync mobile tab state
   if (tab === 'overview') {
@@ -923,7 +932,7 @@ function updateBadges(allPeople) {
   const unaffilBadge = document.getElementById('nb-unaffiliated');
   if (unaffilBadge) unaffilBadge.textContent = unaffilCount || '';
 
-  // Needed Next badge on Overview nav item
+  // Upcoming badge on Overview nav item
   const needsBadge = document.getElementById('nb-needed');
   if (needsBadge) {
     const needsCount = computeNeededNext(allPeople).length;
@@ -1172,7 +1181,7 @@ function personChip(p, size) {
   return chip;
 }
 
-// ── Needed Next ──────────────────────────────────────────────────────────────
+// ── Upcoming (hiring signals) ─────────────────────────────────────────────────
 function computeNeededNext(allPeople) {
   const needs = [];
   const active = allPeople.filter(p => p.status !== 'backfill');
@@ -1353,22 +1362,15 @@ function renderUnaffiliatedCS(el, allPeople) {
   el.appendChild(grid);
 }
 
-function renderOverview(el, allPeople) {
-  el.innerHTML = '';
-
-  const TEAM_COLORS = {
-    Banyan:'#4a7c9e', Aspen:'#7a6040', Oak:'#5a7040', Canopy:'#7a5070', Vista:'#606878'
-  };
-
-  // ── Needed Next Banner ────────────────────────────────────────────────────
+function renderUpcomingTab(el, allPeople) {
   const needs = computeNeededNext(allPeople);
   const nnSection = document.createElement('div');
   nnSection.className = 'nn-section';
 
   const nnHdr = document.createElement('div');
   nnHdr.className = 'nn-header';
-  nnHdr.innerHTML = `<span class="nn-title">Needed Next</span>
-    <span class="nn-subtitle">Upcoming hires based on current staffing trajectory</span>
+  nnHdr.innerHTML = `<span class="nn-title">Upcoming</span>
+    <span class="nn-subtitle">Hiring signals based on current staffing trajectory</span>
     ${needs.length > 0 ? `<span class="nn-count-badge">${needs.length} signal${needs.length !== 1 ? 's' : ''}</span>` : ''}`;
   nnSection.appendChild(nnHdr);
 
@@ -1383,22 +1385,18 @@ function renderOverview(el, allPeople) {
     needs.forEach(need => {
       const card = document.createElement('div');
       card.className = `nn-card nn-card-${need.severity}`;
-
       const iconEl = document.createElement('div');
       iconEl.className = 'nn-card-icon';
       iconEl.textContent = need.icon;
-
       const body = document.createElement('div');
       body.className = 'nn-card-body';
       body.innerHTML = `<div class="nn-card-title">${need.title}</div>
         <div class="nn-card-detail">${need.detail}</div>
         <div class="nn-card-rule">📐 ${need.rule}</div>`;
-
       const badge = document.createElement('span');
       const badgeCls = need.severity === 'high' ? 'high' : need.severity === 'medium' ? 'med' : 'low';
       badge.className = `nn-role-badge nn-role-badge-${badgeCls}`;
       badge.textContent = need.role;
-
       card.appendChild(iconEl);
       card.appendChild(body);
       card.appendChild(badge);
@@ -1407,6 +1405,45 @@ function renderOverview(el, allPeople) {
     nnSection.appendChild(cards);
   }
   el.appendChild(nnSection);
+}
+
+function renderOverview(el, allPeople) {
+  el.innerHTML = '';
+
+  const TEAM_COLORS = {
+    Banyan:'#4a7c9e', Aspen:'#7a6040', Oak:'#5a7040', Canopy:'#7a5070', Vista:'#606878'
+  };
+
+  const needs = computeNeededNext(allPeople);
+
+  // ── Sub-tab bar ───────────────────────────────────────────────────────────
+  const tabBar = document.createElement('div');
+  tabBar.className = 'ov-sub-tabs';
+
+  ['overview', 'upcoming'].forEach(tab => {
+    const btn = document.createElement('button');
+    btn.className = 'ov-sub-tab' + (overviewSubTab === tab ? ' active' : '');
+    const label = tab === 'overview' ? 'Overview' : 'Upcoming';
+    btn.textContent = label;
+    if (tab === 'upcoming' && needs.length > 0) {
+      const badge = document.createElement('span');
+      badge.className = 'ov-sub-tab-badge';
+      badge.textContent = needs.length;
+      btn.appendChild(badge);
+    }
+    btn.onclick = () => {
+      overviewSubTab = tab;
+      renderOverview(el, allPeople);
+    };
+    tabBar.appendChild(btn);
+  });
+  el.appendChild(tabBar);
+
+  // ── Dispatch to sub-tab content ───────────────────────────────────────────
+  if (overviewSubTab === 'upcoming') {
+    renderUpcomingTab(el, allPeople);
+    return;
+  }
 
   const active = allPeople.filter(p => p.status !== 'backfill');
   const seqCount  = active.filter(p => ['SA','LFA','FA'].includes(p.role)).length;
