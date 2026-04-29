@@ -354,6 +354,31 @@ body { font-family: 'Sailec', -apple-system, BlinkMacSystemFont, sans-serif; bac
   }
   .mob-team-chip.active { background: #33342C; color: white; border-color: #33342C; }
 }
+
+/* ── Needed Next Section ───────────────────────────────────────────────────── */
+.nn-section { margin-bottom: 24px; }
+.nn-header { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; }
+.nn-title { font-size: 15px; font-weight: 700; color: var(--text); }
+.nn-subtitle { font-size: 11px; color: var(--text-muted); }
+.nn-count-badge { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 10px; background: #e74c3c; color: white; margin-left: auto; }
+.nn-empty { font-size: 12px; color: #27ae60; padding: 12px 16px; background: #f0faf4; border: 1px solid #b2dfcc; border-radius: 8px; display: flex; align-items: center; gap: 8px; }
+.nn-cards { display: flex; flex-direction: column; gap: 8px; }
+.nn-card { border-radius: 10px; padding: 13px 16px 13px 14px; display: flex; align-items: flex-start; gap: 11px; position: relative; }
+.nn-card-high { background: #fff5f5; border: 1px solid #f5b8b8; }
+.nn-card-medium { background: #fffbf0; border: 1px solid #f5d89b; }
+.nn-card-low { background: #f4f8ff; border: 1px solid #b8d0f5; }
+.nn-card-icon { width: 30px; height: 30px; border-radius: 7px; display: flex; align-items: center; justify-content: center; font-size: 15px; flex-shrink: 0; margin-top: 1px; }
+.nn-card-high .nn-card-icon { background: #fee2e2; }
+.nn-card-medium .nn-card-icon { background: #fef3c7; }
+.nn-card-low .nn-card-icon { background: #dbeafe; }
+.nn-card-body { flex: 1; min-width: 0; padding-right: 42px; }
+.nn-card-title { font-size: 13px; font-weight: 600; color: var(--text); margin-bottom: 3px; line-height: 1.3; }
+.nn-card-detail { font-size: 11px; color: var(--text-muted); line-height: 1.5; margin-bottom: 5px; }
+.nn-card-rule { font-size: 10px; color: var(--text-muted); padding-top: 5px; border-top: 1px solid var(--border); font-style: italic; opacity: 0.75; line-height: 1.4; }
+.nn-role-badge { font-size: 9px; font-weight: 700; padding: 2px 7px; border-radius: 12px; position: absolute; top: 13px; right: 14px; white-space: nowrap; }
+.nn-role-badge-high { background: #fee2e2; color: #c0392b; }
+.nn-role-badge-med { background: #fef3c7; color: #9a6b00; }
+.nn-role-badge-low { background: #dbeafe; color: #2563eb; }
 </style>
 <!-- Supabase JS SDK -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -387,7 +412,7 @@ body { font-family: 'Sailec', -apple-system, BlinkMacSystemFont, sans-serif; bac
 <div class="sidebar">
   <div>
     <div class="sidebar-label">Views</div>
-    <div class="nav-item active" data-tab="overview" onclick="setTab('overview')"><svg style="width:13px;height:13px;stroke:currentColor;fill:none;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0" viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.5"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg> Overview</div>
+    <div class="nav-item active" data-tab="overview" onclick="setTab('overview')"><svg style="width:13px;height:13px;stroke:currentColor;fill:none;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0" viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.5"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg> Overview<span class="nav-badge" id="nb-needed" style="display:none;background:#e74c3c;color:white;border-radius:10px"></span></div>
   </div>
   <div>
     <div class="sidebar-label">Teams</div>
@@ -881,6 +906,18 @@ function updateBadges(allPeople) {
   const unaffilCount = allPeople.filter(p => ['CSA','CSC'].includes(p.role) && !p.team && p.status !== 'backfill').length;
   const unaffilBadge = document.getElementById('nb-unaffiliated');
   if (unaffilBadge) unaffilBadge.textContent = unaffilCount || '';
+
+  // Needed Next badge on Overview nav item
+  const needsBadge = document.getElementById('nb-needed');
+  if (needsBadge) {
+    const needsCount = computeNeededNext(allPeople).length;
+    if (needsCount > 0) {
+      needsBadge.textContent = needsCount;
+      needsBadge.style.display = '';
+    } else {
+      needsBadge.style.display = 'none';
+    }
+  }
 }
 
 function updateChangesList() {
@@ -1097,6 +1134,113 @@ function personChip(p, size) {
   return chip;
 }
 
+// ── Needed Next ──────────────────────────────────────────────────────────────
+function computeNeededNext(allPeople) {
+  const needs = [];
+  const active = allPeople.filter(p => p.status !== 'backfill');
+
+  // Helper: walk a personId up to their SA/LFA/FA pod leader
+  function resolvePodLeaderId(personId) {
+    const person = active.find(p => p.id === personId);
+    if (!person) return null;
+    if (['SA','LFA','FA'].includes(person.role)) return personId;
+    const lead = (person.supportsIds || []).find(lid => {
+      const lp = active.find(p => p.id === lid);
+      return lp && ['SA','LFA','FA'].includes(lp.role);
+    });
+    return lead || null;
+  }
+
+  // ── Trigger 1: No CSCs exist ──────────────────────────────────────────────
+  const cscs = active.filter(p => p.role === 'CSC');
+  if (cscs.length === 0) {
+    needs.push({
+      type: 'no_csc',
+      role: 'CSC',
+      severity: 'high',
+      icon: '⚠️',
+      title: 'No CSCs on staff',
+      detail: 'All CSCs have been promoted to CSA — no entry-level Client Service staff remain to fill the pipeline.',
+      rule: 'Triggered when zero active CSC (Client Service Coordinator) roles exist across all teams.'
+    });
+  }
+
+  // ── Trigger 2: CSC/CSA supporting >4 pods ────────────────────────────────
+  const csAll = active.filter(p => ['CSA','CSC'].includes(p.role));
+  csAll.forEach(cs => {
+    const podIds = new Set();
+    (cs.supportsIds || []).forEach(id => {
+      const plId = resolvePodLeaderId(id);
+      if (plId) podIds.add(plId);
+    });
+    if (podIds.size > 4) {
+      needs.push({
+        type: 'cs_overloaded',
+        role: cs.role,
+        severity: 'medium',
+        icon: '📊',
+        title: `${cs.first} ${cs.last} supporting ${podIds.size} pods`,
+        detail: `${cs.role} on ${cs.team || 'unassigned'} is currently covering ${podIds.size} advisor pods. The recommended maximum is 4 pods per CS staff member — an additional CS hire is needed to reduce load.`,
+        rule: 'Triggered when a CSA or CSC has primary responsibility for more than 4 advisor pods (SA/LFA/FA).'
+      });
+    }
+  });
+
+  // ── Trigger 3: Planned AFA→FA promotion leaves LFA without AFA coverage ──
+  const afaToFaEvents = state.events.filter(ev => {
+    if (ev.type !== 'promotion' || ev.toRole !== 'FA') return false;
+    const person = state.people.find(p => p.id === ev.personId);
+    return person && ['AFA2','AFA1'].includes(person.role);
+  });
+  afaToFaEvents.forEach(ev => {
+    const promoted = state.people.find(p => p.id === ev.personId);
+    if (!promoted) return;
+    const supportedLFAs = (promoted.supportsIds || [])
+      .map(id => state.people.find(p => p.id === id))
+      .filter(p => p && p.role === 'LFA');
+    supportedLFAs.forEach(lfa => {
+      const otherAfas = state.people.filter(p =>
+        p.id !== promoted.id &&
+        ['AFA2','AFA1'].includes(p.role) &&
+        (p.supportsIds || []).includes(lfa.id)
+      );
+      if (otherAfas.length === 0) {
+        needs.push({
+          type: 'afa_backfill',
+          role: 'AFA',
+          severity: 'medium',
+          icon: '🔄',
+          title: `AFA backfill needed — ${lfa.first} ${lfa.last}'s pod`,
+          detail: `${promoted.first} ${promoted.last}'s planned promotion to FA (${ev.date}) will leave ${lfa.first} ${lfa.last} on ${lfa.team || 'no team'} without dedicated AFA support. An AFA2 hire is needed to fill this gap.`,
+          rule: "Triggered when a planned AFA2/AFA1→FA promotion would leave the LFA they currently support with no remaining AFA coverage."
+        });
+      }
+    });
+  });
+
+  // ── Trigger 4: LFA with ≥$50M AUM but no AFA assigned ───────────────────
+  const lfasWithAum = active.filter(p => p.role === 'LFA' && p.aum !== null && p.aum >= AUM_THRESHOLDS.LFA);
+  lfasWithAum.forEach(lfa => {
+    const hasAfa = active.some(p =>
+      ['AFA2','AFA1'].includes(p.role) &&
+      (p.supportsIds || []).includes(lfa.id)
+    );
+    if (!hasAfa) {
+      needs.push({
+        type: 'lfa_aum_eligible',
+        role: 'AFA',
+        severity: 'low',
+        icon: '💰',
+        title: `${lfa.first} ${lfa.last} eligible for dedicated AFA`,
+        detail: `${lfa.first} ${lfa.last} (LFA, ${lfa.team || 'no team'}) has $${lfa.aum}M AUM — above the $${AUM_THRESHOLDS.LFA}M threshold — but has no AFA2/AFA1 currently assigned to their pod.`,
+        rule: `Triggered when an LFA reaches $${AUM_THRESHOLDS.LFA}M+ in billed AUM without a dedicated AFA2/AFA1 assigned to support their pod.`
+      });
+    }
+  });
+
+  return needs;
+}
+
 // ── Overview ─────────────────────────────────────────────────────────────────
 function renderUnaffiliatedCS(el, allPeople) {
   el.innerHTML = '';
@@ -1141,6 +1285,54 @@ function renderOverview(el, allPeople) {
   const TEAM_COLORS = {
     Banyan:'#4a7c9e', Aspen:'#7a6040', Oak:'#5a7040', Canopy:'#7a5070', Vista:'#606878'
   };
+
+  // ── Needed Next Banner ────────────────────────────────────────────────────
+  const needs = computeNeededNext(allPeople);
+  const nnSection = document.createElement('div');
+  nnSection.className = 'nn-section';
+
+  const nnHdr = document.createElement('div');
+  nnHdr.className = 'nn-header';
+  nnHdr.innerHTML = `<span class="nn-title">Needed Next</span>
+    <span class="nn-subtitle">Upcoming hires based on current staffing trajectory</span>
+    ${needs.length > 0 ? `<span class="nn-count-badge">${needs.length} signal${needs.length !== 1 ? 's' : ''}</span>` : ''}`;
+  nnSection.appendChild(nnHdr);
+
+  if (needs.length === 0) {
+    const empty = document.createElement('div');
+    empty.className = 'nn-empty';
+    empty.innerHTML = `<span>✓</span><span>No hiring signals right now — staffing looks healthy across all teams.</span>`;
+    nnSection.appendChild(empty);
+  } else {
+    const cards = document.createElement('div');
+    cards.className = 'nn-cards';
+    needs.forEach(need => {
+      const card = document.createElement('div');
+      card.className = `nn-card nn-card-${need.severity}`;
+
+      const iconEl = document.createElement('div');
+      iconEl.className = 'nn-card-icon';
+      iconEl.textContent = need.icon;
+
+      const body = document.createElement('div');
+      body.className = 'nn-card-body';
+      body.innerHTML = `<div class="nn-card-title">${need.title}</div>
+        <div class="nn-card-detail">${need.detail}</div>
+        <div class="nn-card-rule">📐 ${need.rule}</div>`;
+
+      const badge = document.createElement('span');
+      const badgeCls = need.severity === 'high' ? 'high' : need.severity === 'medium' ? 'med' : 'low';
+      badge.className = `nn-role-badge nn-role-badge-${badgeCls}`;
+      badge.textContent = need.role;
+
+      card.appendChild(iconEl);
+      card.appendChild(body);
+      card.appendChild(badge);
+      cards.appendChild(card);
+    });
+    nnSection.appendChild(cards);
+  }
+  el.appendChild(nnSection);
 
   const active = allPeople.filter(p => p.status !== 'backfill');
   const seqCount  = active.filter(p => ['SA','LFA','FA'].includes(p.role)).length;
