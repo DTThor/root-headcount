@@ -836,7 +836,7 @@ async function signInWithGoogle() {
   const { error } = await _supabase.auth.signInWithOAuth({
     provider: 'google',
     options: {
-      redirectTo: window.location.href,
+      redirectTo: window.location.origin + window.location.pathname,
       queryParams: { hd: 'rootfinancialpartners.com' }
     }
   });
@@ -847,6 +847,7 @@ async function signOut() {
   if (!_supabase) return;
   await _supabase.auth.signOut();
   currentUser = null;
+  _appInitialized = false;
   showLoginScreen();
 }
 
@@ -884,6 +885,8 @@ async function handleAuthUser(user) {
   currentUser = user;
   renderTopbarUser(user);
   hideLoginScreen();
+  // Clean up OAuth token hash from URL
+  if (window.location.hash) history.replaceState(null, '', window.location.pathname);
   if (!_appInitialized) {
     _appInitialized = true;
     state = migrateState(await loadState());
