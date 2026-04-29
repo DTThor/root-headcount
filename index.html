@@ -812,6 +812,7 @@ function subscribeToRealtime() {
 
 // ─── AUTH ─────────────────────────────────────────────────────────────────────
 let currentUser = null;
+let _appInitialized = false;
 
 function showLoginScreen(errorMsg) {
   document.getElementById('login-screen').style.display = 'flex';
@@ -883,7 +884,8 @@ async function handleAuthUser(user) {
   currentUser = user;
   renderTopbarUser(user);
   hideLoginScreen();
-  if (!state || !state.people || state.people.length === 0) {
+  if (!_appInitialized) {
+    _appInitialized = true;
     state = migrateState(await loadState());
     subscribeToRealtime();
     render();
