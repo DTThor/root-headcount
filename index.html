@@ -765,10 +765,13 @@ async function loadState() {
         .select('data')
         .eq('id', 'main')
         .single();
+      if (error) { console.error('[loadState] Supabase error:', error); }
+      else if (!data?.data?.people) { console.warn('[loadState] Supabase returned no people:', data); }
       if (!error && data?.data?.people) {
+        console.log('[loadState] Loaded', data.data.people.length, 'people from Supabase');
         return parseAndFixState(data.data);
       }
-    } catch(e) { console.warn('Supabase load failed, using localStorage fallback', e); }
+    } catch(e) { console.error('[loadState] Supabase exception:', e); }
   }
   // Fallback: localStorage (for local dev / first load before Supabase is configured)
   try {
