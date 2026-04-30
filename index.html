@@ -793,18 +793,15 @@ async function saveState() {
 }
 
 
-// Real-time sync: when another browser/user saves, refresh our state
-let _realtimeSubscribed = false;
+// ─── REALTIME ────────────────────────────────────────────────────────────────
+let _realtimeChannel = null;
 function subscribeToRealtime() {
-  if (!_supabase || SUPABASE_URL === 'YOUR_SUPABASE_URL') return;
-  if (_realtimeSubscribed) return;
-  _realtimeSubscribed = true;
-  _supabase
+  if (!_supabase || SUPABASE_URL === 'YOUR_SUPABASE_URL' || _realtimeChannel) return;
+  _realtimeChannel = _supabase
     .channel('headcount_realtime')
     .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'headcount_state', filter: 'id=eq.main' }, payload => {
       const incoming = payload.new?.data;
       if (!incoming) return;
-      // Only update if the change came from someone else (different lastSaved)
       if (incoming.lastSaved !== state.lastSaved) {
         state = migrateState(parseAndFixState(incoming));
         render();
@@ -812,9 +809,16 @@ function subscribeToRealtime() {
     })
     .subscribe();
 }
+function unsubscribeRealtime() {
+  if (_realtimeChannel && _supabase) {
+    _supabase.removeChannel(_realtimeChannel);
+    _realtimeChannel = null;
+  }
+}
 
 // ─── AUTH ─────────────────────────────────────────────────────────────────────
 let currentUser = null;
+let _authHandled = false;
 
 function showLoginScreen(errorMsg) {
   document.getElementById('login-screen').style.display = 'flex';
@@ -847,27 +851,24 @@ async function signInWithGoogle() {
 
 async function signOut() {
   if (!_supabase) return;
-  await _supabase.auth.signOut();
+  unsubscribeRealtime();
+  _authHandled = false;
   currentUser = null;
-  _realtimeSubscribed = false;
+  await _supabase.auth.signOut();
   showLoginScreen();
 }
 
 function renderTopbarUser(user) {
   const existing = document.getElementById('topbar-user-pill');
   if (existing) existing.remove();
-
   const displayName = user.user_metadata?.full_name || user.email.split('@')[0];
   const avatarUrl = user.user_metadata?.avatar_url;
   const initials = displayName.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
-
   const pill = document.createElement('div');
   pill.id = 'topbar-user-pill';
   pill.className = 'topbar-user';
   pill.title = 'Sign out';
-  pill.onclick = () => {
-    if (confirm(`Sign out of ${user.email}?`)) signOut();
-  };
+  pill.onclick = () => { if (confirm(`Sign out of ${user.email}?`)) signOut(); };
   pill.innerHTML = `
     <div class="topbar-user-avatar">
       ${avatarUrl ? `<img src="${avatarUrl}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">` : initials}
@@ -884,10 +885,13 @@ async function handleAuthUser(user) {
     showLoginScreen('Access is restricted to @rootfinancialpartners.com accounts.');
     return;
   }
+  // Always update user display
   currentUser = user;
   renderTopbarUser(user);
+  // Only load data once per session
+  if (_authHandled) return;
+  _authHandled = true;
   hideLoginScreen();
-  // Clean up OAuth token hash from URL
   if (window.location.hash) history.replaceState(null, '', window.location.pathname);
   state = migrateState(await loadState());
   subscribeToRealtime();
@@ -904,19 +908,25 @@ async function init() {
     return;
   }
 
-  // Show login while we check session
   showLoginScreen();
 
-  // Handle OAuth redirect and ongoing auth state changes
+  // Listen for auth changes (sign-in, sign-out, token refresh)
   _supabase.auth.onAuthStateChange(async (event, session) => {
-    if (session?.user) {
-      await handleAuthUser(session.user);
-    } else {
+    if (event === 'SIGNED_OUT') {
       currentUser = null;
+      _authHandled = false;
+      unsubscribeRealtime();
       showLoginScreen();
+    } else if (session?.user) {
+      await handleAuthUser(session.user);
     }
   });
 
+  // Explicit session check — reliable fallback for existing sessions on page load
+  try {
+    const { data: { session } } = await _supabase.auth.getSession();
+    if (session?.user) await handleAuthUser(session.user);
+  } catch (e) { /* silent — onAuthStateChange will handle it */ }
 }
 init();
 
