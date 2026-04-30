@@ -882,23 +882,30 @@ function renderTopbarUser(user) {
 }
 
 async function handleAuthUser(user) {
+  console.log('[auth] handleAuthUser called:', user?.email, '| _authHandled:', _authHandled);
   if (!user) { showLoginScreen(); return; }
   if (!user.email || !user.email.endsWith('@rootfinancialpartners.com')) {
     await _supabase.auth.signOut();
     showLoginScreen('Access is restricted to @rootfinancialpartners.com accounts.');
     return;
   }
-  // Always update user display
   currentUser = user;
   renderTopbarUser(user);
-  // Only load data once per session
-  if (_authHandled) return;
+  if (_authHandled) { console.log('[auth] skipping load, already handled'); return; }
   _authHandled = true;
   hideLoginScreen();
   if (window.location.hash) history.replaceState(null, '', window.location.pathname);
-  state = migrateState(await loadState());
-  subscribeToRealtime();
-  render();
+  try {
+    console.log('[auth] calling loadState...');
+    const loaded = await loadState();
+    console.log('[auth] loadState returned, people:', loaded?.people?.length);
+    state = migrateState(loaded);
+    subscribeToRealtime();
+    render();
+    console.log('[auth] render complete');
+  } catch(e) {
+    console.error('[auth] error after hideLoginScreen:', e);
+  }
 }
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -915,6 +922,7 @@ async function init() {
 
   // Listen for auth changes (sign-in, sign-out, token refresh)
   _supabase.auth.onAuthStateChange(async (event, session) => {
+    console.log('[auth] onAuthStateChange event:', event, '| user:', session?.user?.email);
     if (event === 'SIGNED_OUT') {
       currentUser = null;
       _authHandled = false;
@@ -927,9 +935,11 @@ async function init() {
 
   // Explicit session check — reliable fallback for existing sessions on page load
   try {
+    console.log('[auth] calling getSession...');
     const { data: { session } } = await _supabase.auth.getSession();
+    console.log('[auth] getSession result:', session?.user?.email ?? 'no session');
     if (session?.user) await handleAuthUser(session.user);
-  } catch (e) { /* silent — onAuthStateChange will handle it */ }
+  } catch (e) { console.error('[auth] getSession error:', e); }
 }
 init();
 
