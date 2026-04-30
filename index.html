@@ -715,6 +715,7 @@ const INITIAL_EVENTS = [
 ];
 
 function migrateState(s) {
+  if (!s || !s.people) return s || { people: [], events: [], photoOverrides: {}, lastSaved: null };
   // SA/LFA/FA are pod leaders — they don't list anyone in supportsIds; clear stale data
   s.people.forEach(p => {
     if (['SA','LFA','FA'].includes(p.role)) p.supportsIds = [];
@@ -4043,11 +4044,7 @@ function exportData() {
 }
 
 
-// Initialize
-window.addEventListener('DOMContentLoaded', () => {
-  
-  render();
-});
+// Initialize — render() is called by handleAuthUser after data loads, not here
 </script>
 </body>
 </html>
