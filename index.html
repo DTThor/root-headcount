@@ -375,13 +375,35 @@ body { font-family: 'Sailec', -apple-system, BlinkMacSystemFont, sans-serif; bac
 /* ── Photo Upload ─────────────────────────────────────────────────────────── */
 .photo-upload-wrap { display:flex; flex-direction:column; align-items:center; gap:8px; padding: 14px 0 10px; border-bottom: 1px solid var(--border); margin-bottom: 12px; }
 .photo-upload-avatar { position:relative; width:80px; height:80px; cursor:pointer; }
-.photo-upload-avatar img,
-.photo-upload-avatar .photo-initials { width:80px; height:80px; border-radius:50%; object-fit:cover; display:block; }
-.photo-initials { display:flex; align-items:center; justify-content:center; font-size:28px; font-weight:700; }
+.photo-upload-avatar img { width:80px; height:80px; border-radius:50%; object-fit:cover; display:block; }
+.photo-initials { width:80px; height:80px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:28px; font-weight:700; }
 .photo-upload-overlay { position:absolute; inset:0; border-radius:50%; background:rgba(0,0,0,0); display:flex; align-items:center; justify-content:center; transition:background 0.18s; }
 .photo-upload-avatar:hover .photo-upload-overlay { background:rgba(0,0,0,0.42); }
 .photo-upload-overlay svg { opacity:0; transition:opacity 0.18s; }
 .photo-upload-avatar:hover .photo-upload-overlay svg { opacity:1; }
+
+/* ── Notes ─────────────────────────────────────────────────────────────────── */
+.notes-wrap { max-width: 720px; margin: 0 auto; padding: 4px 0 40px; }
+.notes-head { margin-bottom: 16px; }
+.notes-head h2 { font-size: 18px; font-weight: 600; margin: 0 0 4px; }
+.notes-head p { font-size: 12px; color: var(--text-muted); margin: 0; line-height: 1.5; }
+.notes-add { display: flex; gap: 8px; margin-bottom: 8px; }
+.notes-add input { flex: 1; padding: 9px 12px; border: 1px solid var(--border); border-radius: 6px; font-size: 13px; font-family: 'Sailec', sans-serif; background: var(--surface); color: var(--text); }
+.notes-add input:focus { outline: none; border-color: var(--accent); }
+.notes-section-label { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; color: var(--text-muted); margin: 20px 0 8px; }
+.note-item { display: flex; align-items: flex-start; gap: 10px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 11px 12px; margin-bottom: 8px; }
+.note-check { flex-shrink: 0; width: 20px; height: 20px; border-radius: 50%; border: 2px solid var(--border); cursor: pointer; margin-top: 1px; display: flex; align-items: center; justify-content: center; transition: background 0.12s, border-color 0.12s; background: none; padding: 0; }
+.note-check:hover { border-color: var(--accent); }
+.note-check.done { background: var(--accent); border-color: var(--accent); }
+.note-check svg { opacity: 0; width: 12px; height: 12px; stroke: white; stroke-width: 3; fill: none; stroke-linecap: round; stroke-linejoin: round; }
+.note-check.done svg { opacity: 1; }
+.note-body { flex: 1; min-width: 0; }
+.note-text { font-size: 13px; color: var(--text); line-height: 1.45; overflow-wrap: anywhere; }
+.note-item.done .note-text { text-decoration: line-through; color: var(--text-muted); }
+.note-meta { font-size: 10px; color: var(--text-muted); margin-top: 3px; }
+.note-del { flex-shrink: 0; background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 17px; line-height: 1; padding: 0 4px; border-radius: 4px; opacity: 0.45; transition: opacity 0.12s, color 0.12s; }
+.note-del:hover { opacity: 1; color: var(--danger); }
+.notes-footer { margin-top: 14px; }
 .photo-upload-label { font-size:11px; color:var(--text-muted); cursor:pointer; }
 .photo-upload-label:hover { color:var(--accent); }
 .photo-remove-btn { font-size:10px; color:#c0392b; background:none; border:none; cursor:pointer; padding:0; font-family:inherit; }
@@ -481,6 +503,10 @@ body { font-family: 'Sailec', -apple-system, BlinkMacSystemFont, sans-serif; bac
     <div class="sidebar-label">Other</div>
     <div class="nav-item" data-tab="unaffiliated" onclick="setTab('unaffiliated')"><div class="team-dot" style="background:none;border:1.5px dashed #aaa"></div>Unaffiliated CS<span class="nav-badge" id="nb-unaffiliated">—</span></div>
   </div>
+  <div>
+    <div class="sidebar-label">Planning</div>
+    <div class="nav-item" data-tab="notes" onclick="setTab('notes')"><svg style="width:13px;height:13px;stroke:currentColor;fill:none;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0" viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>Notes<span class="nav-badge" id="nb-notes"></span></div>
+  </div>
   <div class="sidebar-footer">
     <button class="btn-sm" onclick="exportData()">⬇ Export JSON</button>
   </div>
@@ -506,6 +532,10 @@ body { font-family: 'Sailec', -apple-system, BlinkMacSystemFont, sans-serif; bac
   <button class="mob-tab" id="mobt-teams" onclick="setMobileTab('teams')">
     <svg viewBox="0 0 24 24"><circle cx="9" cy="7" r="3"/><path d="M3 21v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/><path d="M21 21v-2a4 4 0 0 0-3-3.85"/></svg>
     <span class="mob-tab-lbl">Teams</span>
+  </button>
+  <button class="mob-tab" id="mobt-notes" onclick="setMobileTab('notes')">
+    <svg viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+    <span class="mob-tab-lbl">Notes</span>
   </button>
   <button class="mob-tab" id="mobt-changes" onclick="setMobileTab('changes')">
     <svg viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>
@@ -715,7 +745,9 @@ const INITIAL_EVENTS = [
 ];
 
 function migrateState(s) {
-  if (!s || !s.people) return s || { people: [], events: [], photoOverrides: {}, lastSaved: null };
+  if (!s || !s.people) return s || { people: [], events: [], photoOverrides: {}, notes: [], lastSaved: null };
+  // Meeting notes — checklist of changes to make, shared via Supabase
+  if (!Array.isArray(s.notes)) s.notes = [];
   // SA/LFA/FA are pod leaders — they don't list anyone in supportsIds; clear stale data
   s.people.forEach(p => {
     if (['SA','LFA','FA'].includes(p.role)) p.supportsIds = [];
@@ -1028,6 +1060,8 @@ function setMobileTab(tab) {
     changesPanel.classList.remove('mob-open');
     if (tab === 'overview') {
       setTab('overview');
+    } else if (tab === 'notes') {
+      setTab('notes');
     } else if (tab === 'teams') {
       // Go to first team if currently on overview
       const teamKeys = Object.keys(TEAMS);
@@ -1046,6 +1080,10 @@ function setTab(tab) {
     mobileActiveTab = 'overview';
     document.querySelectorAll('.mob-tab').forEach(b => b.classList.remove('active'));
     document.getElementById('mobt-overview')?.classList.add('active');
+  } else if (tab === 'notes') {
+    mobileActiveTab = 'notes';
+    document.querySelectorAll('.mob-tab').forEach(b => b.classList.remove('active'));
+    document.getElementById('mobt-notes')?.classList.add('active');
   } else {
     mobileActiveTab = 'teams';
     document.querySelectorAll('.mob-tab').forEach(b => b.classList.remove('active'));
@@ -1062,6 +1100,8 @@ function render() {
 
   if (currentTab === 'overview') {
     renderOverview(content, allPeople);
+  } else if (currentTab === 'notes') {
+    renderNotes(content);
   } else if (currentTab === 'unaffiliated') {
     renderUnaffiliatedCS(content, allPeople);
   } else {
@@ -1100,6 +1140,13 @@ function updateBadges(allPeople) {
   const unaffilCount = allPeople.filter(p => ['CSA','CSC'].includes(p.role) && !p.team && p.status !== 'backfill').length;
   const unaffilBadge = document.getElementById('nb-unaffiliated');
   if (unaffilBadge) unaffilBadge.textContent = unaffilCount || '';
+
+  // Open-note count on Notes nav item
+  const notesBadge = document.getElementById('nb-notes');
+  if (notesBadge) {
+    const openCount = (state.notes || []).filter(n => !n.done).length;
+    notesBadge.textContent = openCount || '';
+  }
 
   // Upcoming badge on Overview nav item
   const needsBadge = document.getElementById('nb-needed');
@@ -4038,6 +4085,149 @@ function editEvent(eventId) {
   modalRoot.innerHTML = '';
   modalRoot.appendChild(overlay);
   modalRoot.style.display = 'block';
+}
+
+// ── Notes ──────────────────────────────────────────────────────────────────
+function renderNotes(el) {
+  el.innerHTML = '';
+  const notes = state.notes || [];
+  const open = notes.filter(n => !n.done);
+  const done = notes.filter(n => n.done);
+
+  const wrap = document.createElement('div');
+  wrap.className = 'notes-wrap';
+
+  const head = document.createElement('div');
+  head.className = 'notes-head';
+  head.innerHTML = '<h2>Meeting notes</h2><p>Track changes to make as you talk through headcount. Shared with everyone and saved automatically.</p>';
+  wrap.appendChild(head);
+
+  // Add row
+  const addRow = document.createElement('div');
+  addRow.className = 'notes-add';
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.placeholder = 'Add a note, then press Enter';
+  input.maxLength = 500;
+  const addBtn = document.createElement('button');
+  addBtn.className = 'btn-top';
+  addBtn.textContent = 'Add';
+  const submit = () => { if (input.value.trim()) addNote(input.value); };
+  addBtn.onclick = submit;
+  input.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); submit(); } });
+  addRow.appendChild(input);
+  addRow.appendChild(addBtn);
+  wrap.appendChild(addRow);
+
+  function noteRow(n) {
+    const item = document.createElement('div');
+    item.className = 'note-item' + (n.done ? ' done' : '');
+
+    const check = document.createElement('button');
+    check.className = 'note-check' + (n.done ? ' done' : '');
+    check.title = n.done ? 'Mark as not done' : 'Mark as done';
+    check.innerHTML = '<svg viewBox="0 0 24 24"><path d="M5 12l5 5L20 6"/></svg>';
+    check.onclick = () => toggleNote(n.id);
+    item.appendChild(check);
+
+    const body = document.createElement('div');
+    body.className = 'note-body';
+    const text = document.createElement('div');
+    text.className = 'note-text';
+    text.textContent = n.text;
+    body.appendChild(text);
+    const metaParts = [];
+    if (n.author) metaParts.push(n.author.split('@')[0]);
+    if (n.createdAt) metaParts.push(new Date(n.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }));
+    if (metaParts.length) {
+      const meta = document.createElement('div');
+      meta.className = 'note-meta';
+      meta.textContent = metaParts.join(' · ');
+      body.appendChild(meta);
+    }
+    item.appendChild(body);
+
+    const del = document.createElement('button');
+    del.className = 'note-del';
+    del.title = 'Delete note';
+    del.textContent = '×';
+    del.onclick = () => deleteNote(n.id);
+    item.appendChild(del);
+
+    return item;
+  }
+
+  if (notes.length === 0) {
+    const empty = document.createElement('div');
+    empty.className = 'empty-msg';
+    empty.textContent = 'No notes yet. Add the first change you want to track.';
+    wrap.appendChild(empty);
+  } else {
+    // Open notes, newest first
+    open.slice().reverse().forEach(n => wrap.appendChild(noteRow(n)));
+
+    if (done.length) {
+      const lbl = document.createElement('div');
+      lbl.className = 'notes-section-label';
+      lbl.textContent = 'Completed (' + done.length + ')';
+      wrap.appendChild(lbl);
+      done.slice().reverse().forEach(n => wrap.appendChild(noteRow(n)));
+
+      const footer = document.createElement('div');
+      footer.className = 'notes-footer';
+      const clearBtn = document.createElement('button');
+      clearBtn.className = 'btn-sm';
+      clearBtn.textContent = 'Clear completed';
+      clearBtn.onclick = clearDoneNotes;
+      footer.appendChild(clearBtn);
+      wrap.appendChild(footer);
+    }
+  }
+
+  el.appendChild(wrap);
+}
+
+function addNote(text) {
+  text = (text || '').trim();
+  if (!text) return;
+  if (!Array.isArray(state.notes)) state.notes = [];
+  state.notes.push({
+    id: 'n_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7),
+    text: text,
+    done: false,
+    createdAt: new Date().toISOString(),
+    author: (currentUser && currentUser.email) || null
+  });
+  saveState();
+  render();
+  const inp = document.querySelector('.notes-add input');
+  if (inp) inp.focus();
+}
+
+function toggleNote(id) {
+  const n = (state.notes || []).find(x => x.id === id);
+  if (!n) return;
+  n.done = !n.done;
+  saveState();
+  render();
+}
+
+function deleteNote(id) {
+  const n = (state.notes || []).find(x => x.id === id);
+  if (!n) return;
+  if (!confirm('Delete this note?\n\n"' + n.text + '"')) return;
+  state.notes = (state.notes || []).filter(x => x.id !== id);
+  saveState();
+  render();
+}
+
+function clearDoneNotes() {
+  const doneCount = (state.notes || []).filter(n => n.done).length;
+  if (!doneCount) return;
+  if (!confirm('Clear ' + doneCount + ' completed note' + (doneCount === 1 ? '' : 's') + '?')) return;
+  state.notes = (state.notes || []).filter(n => !n.done);
+  saveState();
+  render();
 }
 
 function exportData() {
