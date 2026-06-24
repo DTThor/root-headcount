@@ -385,24 +385,32 @@ body { font-family: 'Sailec', -apple-system, BlinkMacSystemFont, sans-serif; bac
 /* ── Notes ─────────────────────────────────────────────────────────────────── */
 .notes-wrap { max-width: 720px; margin: 0 auto; padding: 4px 0 40px; }
 .notes-head { margin-bottom: 16px; }
-.notes-head h2 { font-size: 18px; font-weight: 600; margin: 0 0 4px; }
+.notes-head h2 { font-size: 19px; font-weight: 600; margin: 0 0 4px; }
 .notes-head p { font-size: 12px; color: var(--text-muted); margin: 0; line-height: 1.5; }
+.notes-saved { font-size: 11px; color: var(--text-muted); margin-top: 8px; display: flex; align-items: center; gap: 6px; }
+.notes-saved .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); flex-shrink: 0; }
 .notes-add { display: flex; gap: 8px; margin-bottom: 8px; }
-.notes-add input { flex: 1; padding: 9px 12px; border: 1px solid var(--border); border-radius: 6px; font-size: 13px; font-family: 'Sailec', sans-serif; background: var(--surface); color: var(--text); }
+.notes-add input { flex: 1; padding: 11px 13px; border: 1px solid var(--border); border-radius: 7px; font-size: 14px; font-family: 'Sailec', sans-serif; background: var(--surface); color: var(--text); }
 .notes-add input:focus { outline: none; border-color: var(--accent); }
 .notes-section-label { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; color: var(--text-muted); margin: 20px 0 8px; }
-.note-item { display: flex; align-items: flex-start; gap: 10px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 11px 12px; margin-bottom: 8px; }
+.note-item { display: flex; align-items: flex-start; gap: 11px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 13px 14px; margin-bottom: 8px; }
 .note-check { flex-shrink: 0; width: 20px; height: 20px; border-radius: 50%; border: 2px solid var(--border); cursor: pointer; margin-top: 1px; display: flex; align-items: center; justify-content: center; transition: background 0.12s, border-color 0.12s; background: none; padding: 0; }
 .note-check:hover { border-color: var(--accent); }
 .note-check.done { background: var(--accent); border-color: var(--accent); }
 .note-check svg { opacity: 0; width: 12px; height: 12px; stroke: white; stroke-width: 3; fill: none; stroke-linecap: round; stroke-linejoin: round; }
 .note-check.done svg { opacity: 1; }
 .note-body { flex: 1; min-width: 0; }
-.note-text { font-size: 13px; color: var(--text); line-height: 1.45; overflow-wrap: anywhere; }
+.note-text { font-size: 14px; color: var(--text); line-height: 1.5; overflow-wrap: anywhere; cursor: text; }
 .note-item.done .note-text { text-decoration: line-through; color: var(--text-muted); }
-.note-meta { font-size: 10px; color: var(--text-muted); margin-top: 3px; }
-.note-del { flex-shrink: 0; background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 17px; line-height: 1; padding: 0 4px; border-radius: 4px; opacity: 0.45; transition: opacity 0.12s, color 0.12s; }
+.note-meta { font-size: 10px; color: var(--text-muted); margin-top: 4px; }
+.note-edit-input { width: 100%; font-family: 'Sailec', sans-serif; font-size: 14px; color: var(--text); border: 1px solid var(--accent); border-radius: 6px; padding: 7px 9px; resize: none; box-sizing: border-box; background: var(--surface); line-height: 1.5; }
+.note-edit-input:focus { outline: none; }
+.note-acts { display: flex; align-items: center; gap: 2px; flex-shrink: 0; }
+.note-edit, .note-del { background: none; border: none; color: var(--text-muted); cursor: pointer; border-radius: 4px; opacity: 0.45; transition: opacity 0.12s, color 0.12s; display: flex; align-items: center; padding: 2px 3px; }
+.note-edit:hover { opacity: 1; color: var(--accent); }
+.note-del { font-size: 17px; line-height: 1; padding: 0 4px; }
 .note-del:hover { opacity: 1; color: var(--danger); }
+.note-edit svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .notes-footer { margin-top: 14px; }
 .photo-upload-label { font-size:11px; color:var(--text-muted); cursor:pointer; }
 .photo-upload-label:hover { color:var(--accent); }
@@ -481,6 +489,7 @@ body { font-family: 'Sailec', -apple-system, BlinkMacSystemFont, sans-serif; bac
   <div class="proj-wrap" id="proj-wrap">
     as of <input type="date" id="proj-date" onchange="render()">
   </div>
+  <button class="btn-top secondary" onclick="setTab('notes')" title="Meeting notes" style="display:flex;align-items:center;gap:6px"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>Notes<span id="tb-notes-count" style="display:none;background:#9F5E35;color:#fff;border-radius:9px;font-size:10px;font-weight:600;padding:1px 6px;margin-left:1px">0</span></button>
   <button class="btn-top secondary" onclick="openAddPersonModal()">+ Person</button>
   <button class="btn-top" onclick="openAddEventModal()">+ Change Event</button>
 </div>
@@ -1141,11 +1150,14 @@ function updateBadges(allPeople) {
   const unaffilBadge = document.getElementById('nb-unaffiliated');
   if (unaffilBadge) unaffilBadge.textContent = unaffilCount || '';
 
-  // Open-note count on Notes nav item
+  // Open-note count on Notes nav item + topbar button
+  const openNotes = (state.notes || []).filter(n => !n.done).length;
   const notesBadge = document.getElementById('nb-notes');
-  if (notesBadge) {
-    const openCount = (state.notes || []).filter(n => !n.done).length;
-    notesBadge.textContent = openCount || '';
+  if (notesBadge) notesBadge.textContent = openNotes || '';
+  const tbNotes = document.getElementById('tb-notes-count');
+  if (tbNotes) {
+    tbNotes.textContent = openNotes;
+    tbNotes.style.display = openNotes > 0 ? '' : 'none';
   }
 
   // Upcoming badge on Overview nav item
@@ -4099,7 +4111,16 @@ function renderNotes(el) {
 
   const head = document.createElement('div');
   head.className = 'notes-head';
-  head.innerHTML = '<h2>Meeting notes</h2><p>Track changes to make as you talk through headcount. Shared with everyone and saved automatically.</p>';
+  head.innerHTML = '<h2>Meeting notes</h2><p>Track changes to make as you talk through headcount. Shared with everyone on the team.</p>';
+  if (state.lastSaved) {
+    const saved = document.createElement('div');
+    saved.className = 'notes-saved';
+    saved.innerHTML = '<span class="dot"></span>';
+    const t = document.createElement('span');
+    t.textContent = 'All changes saved · ' + new Date(state.lastSaved).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+    saved.appendChild(t);
+    head.appendChild(saved);
+  }
   wrap.appendChild(head);
 
   // Add row
@@ -4135,10 +4156,13 @@ function renderNotes(el) {
     const text = document.createElement('div');
     text.className = 'note-text';
     text.textContent = n.text;
+    text.title = 'Double-click to edit';
+    text.ondblclick = () => beginEditNote(text, item, n);
     body.appendChild(text);
     const metaParts = [];
     if (n.author) metaParts.push(n.author.split('@')[0]);
-    if (n.createdAt) metaParts.push(new Date(n.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }));
+    if (n.editedAt) metaParts.push('edited ' + new Date(n.editedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }));
+    else if (n.createdAt) metaParts.push(new Date(n.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }));
     if (metaParts.length) {
       const meta = document.createElement('div');
       meta.className = 'note-meta';
@@ -4147,12 +4171,21 @@ function renderNotes(el) {
     }
     item.appendChild(body);
 
+    const acts = document.createElement('div');
+    acts.className = 'note-acts';
+    const edit = document.createElement('button');
+    edit.className = 'note-edit';
+    edit.title = 'Edit note';
+    edit.innerHTML = '<svg viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>';
+    edit.onclick = () => beginEditNote(text, item, n);
+    acts.appendChild(edit);
     const del = document.createElement('button');
     del.className = 'note-del';
     del.title = 'Delete note';
     del.textContent = '×';
     del.onclick = () => deleteNote(n.id);
-    item.appendChild(del);
+    acts.appendChild(del);
+    item.appendChild(acts);
 
     return item;
   }
@@ -4185,6 +4218,36 @@ function renderNotes(el) {
   }
 
   el.appendChild(wrap);
+}
+
+function beginEditNote(textEl, item, n) {
+  if (item.querySelector('.note-edit-input')) return; // already editing
+  const ta = document.createElement('textarea');
+  ta.className = 'note-edit-input';
+  ta.value = n.text;
+  textEl.replaceWith(ta);
+  const autosize = () => { ta.style.height = 'auto'; ta.style.height = ta.scrollHeight + 'px'; };
+  ta.addEventListener('input', autosize);
+  autosize();
+  ta.focus();
+  ta.setSelectionRange(ta.value.length, ta.value.length);
+  let settled = false;
+  const commit = () => {
+    if (settled) return; settled = true;
+    const v = ta.value.trim();
+    if (v && v !== n.text) {
+      n.text = v;
+      n.editedAt = new Date().toISOString();
+      saveState();
+    }
+    render();
+  };
+  const cancel = () => { if (settled) return; settled = true; render(); };
+  ta.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); commit(); }
+    else if (e.key === 'Escape') { e.preventDefault(); cancel(); }
+  });
+  ta.addEventListener('blur', commit);
 }
 
 function addNote(text) {
