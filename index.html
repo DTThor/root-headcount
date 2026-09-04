@@ -998,17 +998,33 @@ function getProjDate() {
   return v ? new Date(v + 'T00:00:00Z') : new Date();
 }
 
+// Null-safe initials — never throws on blank/missing names
+function personInitials(p) {
+  const f = (p && p.first && p.first[0]) ? p.first[0] : '';
+  const l = (p && p.last && p.last[0]) ? p.last[0] : '';
+  return (f + l).toUpperCase();
+}
+
 function getVisiblePeople() {
   const todayStr = new Date().toISOString().split('T')[0];
   const cutoffStr = currentView === 'current'
     ? todayStr
     : (document.getElementById('proj-date')?.value || todayStr);
   const visible = JSON.parse(JSON.stringify(state.people));
+  const seenEventIds = new Set();
   state.events.forEach(ev => {
+    // Guard against duplicate event records (same id saved more than once)
+    if (ev.id) { if (seenEventIds.has(ev.id)) return; seenEventIds.add(ev.id); }
     if (!ev.date || ev.date > cutoffStr) return;
     if (ev.type === 'new_hire') {
-      // Always create a fresh person — never reuse an existing person for new_hire
-      const newP = { id: 'nh_' + ev.id, first: ev.newFirst || '', last: ev.newLast || '', role: ev.toRole || 'AFA2', team: ev.toTeam || '', dept: (ev.toRole || '').startsWith('CS') ? 'Client Service' : 'Advisory', status: 'active', criteria: {}, aum: null, supportsIds: ev.supportsIds || [] };
+      // A new_hire must describe an incoming person, never reference an existing one.
+      // Reject malformed records (they otherwise create blank-named phantom people
+      // that crash pod rendering).
+      if (ev.personId) return;
+      const nhFirst = ev.newFirst || '';
+      const nhLast = ev.newLast || '';
+      if (!nhFirst && !nhLast) return;
+      const newP = { id: 'nh_' + ev.id, first: nhFirst, last: nhLast, role: ev.toRole || 'AFA2', team: ev.toTeam || '', dept: (ev.toRole || '').startsWith('CS') ? 'Client Service' : 'Advisory', status: 'active', criteria: {}, aum: null, supportsIds: ev.supportsIds || [] };
       visible.push(newP);
       return;
     }
@@ -1371,7 +1387,7 @@ function personChip(p, size) {
 
   chip.onclick = () => openPersonModal(p.id);
   const rc = ROLE_COLORS[p.role];
-  const initials = (p.first[0] + p.last[0]).toUpperCase();
+  const initials = personInitials(p);
   chip.appendChild(avatarEl(p, size, rc.bg, rc.text, initials, false));
   const nm = document.createElement('div');
   nm.className = 'sv-leader-name';
@@ -1576,7 +1592,7 @@ function renderUnaffiliatedCS(el, allPeople) {
     card.onclick = () => openPersonModal(p.id);
     const rc = ROLE_COLORS[p.role];
     const src = (state.photoOverrides && state.photoOverrides[p.id]) || PHOTO_DATA[p.id];
-    const initials = (p.first[0] + (p.last[0] || '')).toUpperCase();
+    const initials = personInitials(p);
     const avatarHtml = src
       ? `<img src="${src}" style="width:40px;height:40px;border-radius:50%;object-fit:cover;display:block;margin-bottom:7px">`
       : `<div style="width:40px;height:40px;border-radius:50%;background:${rc.bg};color:${rc.text};display:flex;align-items:center;justify-content:center;font-weight:700;font-size:15px;margin-bottom:7px">${initials}</div>`;
@@ -2186,7 +2202,7 @@ function renderSupportViewLayout(el, team, people, allPeople) {
     if (pl.status === 'leave') leaderChip.classList.add('sv-leave');
     leaderChip.onclick = () => openPersonModal(pl.id);
     const rc = ROLE_COLORS[pl.role];
-    leaderChip.appendChild(avatarEl(pl, 36, rc.bg, rc.text, (pl.first[0]+pl.last[0]).toUpperCase(), false));
+    leaderChip.appendChild(avatarEl(pl, 36, rc.bg, rc.text, personInitials(pl), false));
     const nm = document.createElement('div'); nm.className = 'sv-leader-name';
     if (pl.status === 'leave') nm.classList.add('sv-leave-text');
     nm.textContent = pl.first + ' ' + pl.last;
@@ -2222,7 +2238,7 @@ function renderSupportViewLayout(el, team, people, allPeople) {
         chip.style.cursor = 'pointer'; chip.style.width = 'auto'; chip.style.minWidth = '80px';
         chip.onclick = () => openPersonModal(a.id);
         const arc = ROLE_COLORS[a.role];
-        chip.appendChild(avatarEl(a, 36, arc.bg, arc.text, (a.first[0]+a.last[0]).toUpperCase(), false));
+        chip.appendChild(avatarEl(a, 36, arc.bg, arc.text, personInitials(a), false));
         const cn = document.createElement('div'); cn.className = 'sv-leader-name';
         if (a.status === 'leave') cn.classList.add('sv-leave-text');
         cn.textContent = a.first + ' ' + a.last;
@@ -2300,7 +2316,7 @@ function renderSupportViewLayout(el, team, people, allPeople) {
         img.style.cssText = 'width:100%;height:100%;border-radius:50%;object-fit:cover;display:block';
         av.appendChild(img);
       } else {
-        av.textContent = (cs.first[0]+cs.last[0]).toUpperCase();
+        av.textContent = personInitials(cs);
       }
       badge.appendChild(av);
       const txt = document.createElement('div');
@@ -2356,7 +2372,7 @@ function renderSupportViewLayout(el, team, people, allPeople) {
       chip.style.cssText = 'cursor:pointer;width:auto;min-width:80px;opacity:0.8';
       chip.onclick = () => openPersonModal(a.id);
       const arc = ROLE_COLORS[a.role];
-      chip.appendChild(avatarEl(a, 36, arc.bg, arc.text, (a.first[0]+a.last[0]).toUpperCase(), false));
+      chip.appendChild(avatarEl(a, 36, arc.bg, arc.text, personInitials(a), false));
       const cn = document.createElement('div'); cn.className = 'sv-leader-name'; cn.textContent = a.first + ' ' + a.last;
       const cr = document.createElement('div'); cr.className = 'sv-role-badge'; cr.style.background = arc.bg; cr.style.color = arc.text; cr.textContent = a.role;
       chip.appendChild(cn); chip.appendChild(cr);
@@ -2389,7 +2405,7 @@ function renderSupportViewLayout(el, team, people, allPeople) {
       card.className = 'sv-leader-chip';
       card.style.cursor = 'pointer'; card.style.minWidth = '80px'; card.style.width = 'auto';
       card.onclick = () => openPersonModal(cs.id);
-      card.appendChild(avatarEl(cs, 36, rc.bg, rc.text, (cs.first[0]+cs.last[0]).toUpperCase(), false));
+      card.appendChild(avatarEl(cs, 36, rc.bg, rc.text, personInitials(cs), false));
       const nm = document.createElement('div'); nm.className = 'sv-leader-name';
       nm.textContent = cs.first + ' ' + cs.last;
       card.appendChild(nm);
@@ -2470,7 +2486,7 @@ function openPersonModal(personId) {
 
   // ── Photo upload ────────────────────────────────────────────────────────
   const rc0 = ROLE_COLORS[person.role] || { bg:'#888', text:'#fff' };
-  const initials0 = (person.first[0] + person.last[0]).toUpperCase();
+  const initials0 = personInitials(person);
 
   const photoWrap = document.createElement('div');
   photoWrap.className = 'photo-upload-wrap';
@@ -3172,7 +3188,7 @@ function handleSearch(query) {
         img.src = src; img.style.cssText = 'width:100%;height:100%;object-fit:cover';
         av.appendChild(img);
       } else {
-        av.textContent = (p.first[0] + p.last[0]).toUpperCase();
+        av.textContent = personInitials(p);
       }
       item.appendChild(av);
       // Text
@@ -3832,10 +3848,28 @@ function openAddEventModal(defaults = {}) {
   saveBtn.className = 'btn-primary';
   saveBtn.textContent = 'Save';
   saveBtn.onclick = () => {
+    // Normalize by type so a record can never carry conflicting fields
+    // (a new_hire pointing at an existing person creates blank-named phantoms).
+    if (event.type === 'new_hire') {
+      event.personId = null;
+      if (!(event.newFirst || '').trim() && !(event.newLast || '').trim()) {
+        alert('Add the new hire\'s name before saving.');
+        return;
+      }
+    } else {
+      event.newFirst = '';
+      event.newLast = '';
+      if (!event.personId) {
+        alert('Select a person for this event before saving.');
+        return;
+      }
+    }
     applyPendingUpdates(pendingUpdates);
-    state.events.push(event);
+    // Guard against a double-click pushing the same event id more than once
+    if (!state.events.some(e => e.id === event.id)) state.events.push(event);
     saveState();
     render();
+    saveBtn.disabled = true;
     if (!maybeOfferBackfill(event)) {
       modalRoot.innerHTML = '';
       modalRoot.style.display = 'none';
@@ -4058,6 +4092,21 @@ function editEvent(eventId) {
   saveBtn.className = 'btn-primary';
   saveBtn.textContent = 'Save';
   saveBtn.onclick = () => {
+    // Same type-normalization as the add flow: keep a record's fields consistent with its type
+    if (event.type === 'new_hire') {
+      event.personId = null;
+      if (!(event.newFirst || '').trim() && !(event.newLast || '').trim()) {
+        alert('Add the new hire\'s name before saving.');
+        return;
+      }
+    } else {
+      event.newFirst = '';
+      event.newLast = '';
+      if (!event.personId) {
+        alert('Select a person for this event before saving.');
+        return;
+      }
+    }
     applyPendingUpdates(pendingUpdatesEdit);
     const isNew = !state.events.find(e => e.id === eventId);
     const idx = state.events.findIndex(e => e.id === eventId);
