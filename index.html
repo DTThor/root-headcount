@@ -2823,6 +2823,23 @@ function openPersonModal(personId) {
       _ev.toTeam = person.team;
       _ev.supportsIds = [...(person.supportsIds || [])];
     }
+    // Reconcile on_leave / return events the same way, so a status edited here isn't
+    // re-overridden by getVisiblePeople(). A person's leave state as of the cutoff is
+    // the latest applied on_leave/return event; if that conflicts with the status just
+    // chosen, drop those applied (<= cutoff) events so the direct edit stands. Future-dated
+    // leave/return events are left untouched.
+    const _appliedLR = state.events
+      .filter(ev => ev.personId === personId && (ev.type === 'on_leave' || ev.type === 'return') && ev.date && ev.date <= _cutoffNow)
+      .sort((a, b) => (a.date < b.date ? -1 : 1));
+    if (_appliedLR.length) {
+      const _netLeave = _appliedLR[_appliedLR.length - 1].type === 'on_leave'; // true => events impose "leave"
+      const _wantLeave = person.status === 'leave';
+      if (_netLeave !== _wantLeave) {
+        state.events = state.events.filter(ev =>
+          !(ev.personId === personId && (ev.type === 'on_leave' || ev.type === 'return') && ev.date && ev.date <= _cutoffNow)
+        );
+      }
+    }
     saveState();
     render();
     modalRoot.innerHTML = '';
@@ -3704,7 +3721,14 @@ function openAddEventModal(defaults = {}) {
     fs1.appendChild(opt);
   });
   fs1.value = event.type;
-  fs1.onchange = (e) => { event.type = e.target.value; rebuildEventSupportsSection(event, fgSupports, pendingUpdates); };
+  fs1.onchange = (e) => {
+    event.type = e.target.value;
+    // Clear the fields that don't apply to the new type so nothing stale is carried
+    if (event.type === 'new_hire') { event.personId = null; fs3.value = ''; }
+    else { event.newFirst = ''; event.newLast = ''; fi4.value = ''; fi5.value = ''; }
+    applyEventTypeVisibility();
+    rebuildEventSupportsSection(event, fgSupports, pendingUpdates);
+  };
   fg1.appendChild(l1);
   fg1.appendChild(fs1);
   body.appendChild(fg1);
@@ -3749,7 +3773,7 @@ function openAddEventModal(defaults = {}) {
   fg4.className = 'fg';
   const l4 = document.createElement('label');
   l4.className = 'fl';
-  l4.textContent = 'New Hire First Name (if applicable)';
+  l4.textContent = 'First Name';
   const fi4 = document.createElement('input');
   fi4.className = 'fi';
   fi4.type = 'text';
@@ -3763,7 +3787,7 @@ function openAddEventModal(defaults = {}) {
   fg5.className = 'fg';
   const l5 = document.createElement('label');
   l5.className = 'fl';
-  l5.textContent = 'New Hire Last Name (if applicable)';
+  l5.textContent = 'Last Name';
   const fi5 = document.createElement('input');
   fi5.className = 'fi';
   fi5.type = 'text';
@@ -3777,7 +3801,7 @@ function openAddEventModal(defaults = {}) {
   fg6.className = 'fg';
   const l6 = document.createElement('label');
   l6.className = 'fl';
-  l6.textContent = 'To Role (if applicable)';
+  l6.textContent = 'To Role';
   const fs6 = document.createElement('select');
   fs6.className = 'fs';
   ROLES.forEach(r => {
@@ -3799,7 +3823,7 @@ function openAddEventModal(defaults = {}) {
   fg7.className = 'fg';
   const l7 = document.createElement('label');
   l7.className = 'fl';
-  l7.textContent = 'To Team (if applicable)';
+  l7.textContent = 'To Team';
   const fs7 = document.createElement('select');
   fs7.className = 'fs';
   const opt0b = document.createElement('option');
@@ -3826,6 +3850,20 @@ function openAddEventModal(defaults = {}) {
   const fgSupports = document.createElement('div');
   rebuildEventSupportsSection(event, fgSupports, pendingUpdates);
   body.appendChild(fgSupports);
+
+  // Show only the fields relevant to the selected event type
+  function applyEventTypeVisibility() {
+    const t = event.type;
+    const isNewHire = t === 'new_hire';
+    const roleTypes = ['promotion', 'new_hire', 'backfill'];
+    const teamTypes = ['promotion', 'new_hire', 'team_move', 'backfill'];
+    fg3.style.display = isNewHire ? 'none' : '';   // Person picker — every type except new hire
+    fg4.style.display = isNewHire ? '' : 'none';   // First name — new hire only
+    fg5.style.display = isNewHire ? '' : 'none';   // Last name — new hire only
+    fg6.style.display = roleTypes.includes(t) ? '' : 'none';  // To Role
+    fg7.style.display = teamTypes.includes(t) ? '' : 'none';  // To Team
+  }
+  applyEventTypeVisibility();
 
   const fg8 = document.createElement('div');
   fg8.className = 'fg';
@@ -3937,7 +3975,13 @@ function editEvent(eventId) {
     fs1.appendChild(opt);
   });
   fs1.value = event.type;
-  fs1.onchange = (e) => { event.type = e.target.value; };
+  fs1.onchange = (e) => {
+    event.type = e.target.value;
+    if (event.type === 'new_hire') { event.personId = null; fs3.value = ''; }
+    else { event.newFirst = ''; event.newLast = ''; fi4.value = ''; fi5.value = ''; }
+    applyEventTypeVisibility();
+    rebuildEventSupportsSection(event, fgSupportsEdit, pendingUpdatesEdit);
+  };
   fg1.appendChild(l1);
   fg1.appendChild(fs1);
   body.appendChild(fg1);
@@ -3983,7 +4027,7 @@ function editEvent(eventId) {
   fg4.className = 'fg';
   const l4 = document.createElement('label');
   l4.className = 'fl';
-  l4.textContent = 'New Hire First Name (if applicable)';
+  l4.textContent = 'First Name';
   const fi4 = document.createElement('input');
   fi4.className = 'fi';
   fi4.type = 'text';
@@ -3997,7 +4041,7 @@ function editEvent(eventId) {
   fg5.className = 'fg';
   const l5 = document.createElement('label');
   l5.className = 'fl';
-  l5.textContent = 'New Hire Last Name (if applicable)';
+  l5.textContent = 'Last Name';
   const fi5 = document.createElement('input');
   fi5.className = 'fi';
   fi5.type = 'text';
@@ -4011,7 +4055,7 @@ function editEvent(eventId) {
   fg6.className = 'fg';
   const l6 = document.createElement('label');
   l6.className = 'fl';
-  l6.textContent = 'To Role (if applicable)';
+  l6.textContent = 'To Role';
   const fs6 = document.createElement('select');
   fs6.className = 'fs';
   ROLES.forEach(r => {
@@ -4033,7 +4077,7 @@ function editEvent(eventId) {
   fg7.className = 'fg';
   const l7 = document.createElement('label');
   l7.className = 'fl';
-  l7.textContent = 'To Team (if applicable)';
+  l7.textContent = 'To Team';
   const fs7 = document.createElement('select');
   fs7.className = 'fs';
   const opt0b = document.createElement('option');
@@ -4060,6 +4104,20 @@ function editEvent(eventId) {
   const fgSupportsEdit = document.createElement('div');
   rebuildEventSupportsSection(event, fgSupportsEdit, pendingUpdatesEdit);
   body.appendChild(fgSupportsEdit);
+
+  // Show only the fields relevant to the selected event type
+  function applyEventTypeVisibility() {
+    const t = event.type;
+    const isNewHire = t === 'new_hire';
+    const roleTypes = ['promotion', 'new_hire', 'backfill'];
+    const teamTypes = ['promotion', 'new_hire', 'team_move', 'backfill'];
+    fg3.style.display = isNewHire ? 'none' : '';   // Person picker — every type except new hire
+    fg4.style.display = isNewHire ? '' : 'none';   // First name — new hire only
+    fg5.style.display = isNewHire ? '' : 'none';   // Last name — new hire only
+    fg6.style.display = roleTypes.includes(t) ? '' : 'none';  // To Role
+    fg7.style.display = teamTypes.includes(t) ? '' : 'none';  // To Team
+  }
+  applyEventTypeVisibility();
 
   const fg8 = document.createElement('div');
   fg8.className = 'fg';
