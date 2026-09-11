@@ -2178,7 +2178,13 @@ function renderRoleGrid(el, team, people, allPeople) {
   const afas = people.filter(p => p.role === 'AFA2' || p.role === 'AFA1').sort((a,b) => {
     const r = a.role.localeCompare(b.role); return r !== 0 ? r : a.first.localeCompare(b.first);
   });
-  const csList = people.filter(p => p.role === 'CSA' || p.role === 'CSC').sort((a,b) => a.first.localeCompare(b.first));
+  const _podLeaderIdsThisTeam = new Set(people.filter(p => ['SA','LFA','FA'].includes(p.role)).map(p => p.id));
+  const csList = [
+    // CS staff on this team
+    ...people.filter(p => p.role === 'CSA' || p.role === 'CSC'),
+    // plus CS staff from other teams who support a pod leader on this team
+    ...allPeople.filter(p => (p.role === 'CSA' || p.role === 'CSC') && p.team !== team && (p.supportsIds || []).some(id => _podLeaderIdsThisTeam.has(id)))
+  ].sort((a,b) => a.first.localeCompare(b.first));
 
   const podLeaders = [];
   if (sa) podLeaders.push(sa);
@@ -2294,7 +2300,15 @@ function renderRoleGrid(el, team, people, allPeople) {
     } else {
       csIds.forEach(csId => {
         const info = csInfoMap.get(csId); if (!info) return;
-        cell.appendChild(personChip(info.person, 36));
+        const chip = personChip(info.person, 36);
+        // Flag CS staff shared from another team
+        if (info.person.team && info.person.team !== team) {
+          const tl = document.createElement('div');
+          tl.textContent = info.person.team;
+          tl.style.cssText = 'font-size:8px;font-weight:600;color:var(--text-muted);margin-top:1px';
+          chip.appendChild(tl);
+        }
+        cell.appendChild(chip);
       });
     }
     return cell;
@@ -2382,7 +2396,13 @@ function renderSupportViewLayout(el, team, people, allPeople) {
   const afas = people.filter(p => p.role === 'AFA2' || p.role === 'AFA1').sort((a,b) => {
     const r = a.role.localeCompare(b.role); return r !== 0 ? r : a.first.localeCompare(b.first);
   });
-  const csList = people.filter(p => p.role === 'CSA' || p.role === 'CSC').sort((a,b) => a.first.localeCompare(b.first));
+  const _podLeaderIdsThisTeam = new Set(people.filter(p => ['SA','LFA','FA'].includes(p.role)).map(p => p.id));
+  const csList = [
+    // CS staff on this team
+    ...people.filter(p => p.role === 'CSA' || p.role === 'CSC'),
+    // plus CS staff from other teams who support a pod leader on this team
+    ...allPeople.filter(p => (p.role === 'CSA' || p.role === 'CSC') && p.team !== team && (p.supportsIds || []).some(id => _podLeaderIdsThisTeam.has(id)))
+  ].sort((a,b) => a.first.localeCompare(b.first));
 
   const podLeaders = [];
   if (sa) podLeaders.push(sa);
@@ -2559,7 +2579,9 @@ function renderSupportViewLayout(el, team, people, allPeople) {
       badge.appendChild(av);
       const txt = document.createElement('div');
       const n = document.createElement('div'); n.className = 'sv-cs-badge-name'; n.textContent = cs.first + ' ' + cs.last;
-      const r = document.createElement('div'); r.className = 'sv-cs-badge-role'; r.textContent = cs.role;
+      const r = document.createElement('div'); r.className = 'sv-cs-badge-role';
+      // Flag CS staff who belong to another team (shared onto this team's pod)
+      r.textContent = (cs.team && cs.team !== team) ? (cs.role + ' · ' + cs.team) : cs.role;
       txt.appendChild(n); txt.appendChild(r);
       badge.appendChild(txt);
       labelRow.appendChild(badge);
@@ -3694,6 +3716,22 @@ function openAddPersonModal(defaults = {}) {
 
 // Builds a "Supported By" section for SA/LFA/FA — reverse lookup of who supports this person.
 // pendingUpdates: array to collect {supporterId, personId, add} changes to apply on Save.
+// Appends checkbox items grouped under team headers (used when a CS person can
+// support advisors across any team). buildItem(advisor) returns the row element.
+function appendAdvisorsByTeam(container, advisors, buildItem) {
+  const byTeam = {};
+  advisors.forEach(a => { const t = a.team || 'Unassigned'; (byTeam[t] = byTeam[t] || []).push(a); });
+  [...Object.keys(TEAMS), 'Unassigned'].forEach(t => {
+    const list = byTeam[t];
+    if (!list || !list.length) return;
+    const hdr = document.createElement('div');
+    hdr.style.cssText = 'font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;color:var(--text-muted);margin:9px 0 2px';
+    hdr.textContent = t;
+    container.appendChild(hdr);
+    list.forEach(a => container.appendChild(buildItem(a)));
+  });
+}
+
 function buildSupportedByUI(personId, team, containerEl, pendingUpdates) {
   containerEl.innerHTML = '';
   if (!team) {
@@ -3711,17 +3749,19 @@ function buildSupportedByUI(personId, team, containerEl, pendingUpdates) {
   section.appendChild(titleEl);
 
   const visiblePeople = getVisiblePeople();
+  // AFAs support their own pod (same team); CS staff may support this advisor from any team.
   const potentialSupporters = visiblePeople.filter(p =>
-    ['AFA2', 'AFA1', 'CSA', 'CSC'].includes(p.role) && p.team === team
+    ['CSA', 'CSC'].includes(p.role) ||
+    (['AFA2', 'AFA1'].includes(p.role) && p.team === team)
   );
 
   if (potentialSupporters.length === 0) {
     const note = document.createElement('div');
     note.style.cssText = 'color:#999;font-size:12px;font-style:italic;padding:4px 0';
-    note.textContent = 'No AFA or CS staff on this team yet.';
+    note.textContent = 'No AFA or CS staff available yet.';
     section.appendChild(note);
   } else {
-    potentialSupporters.forEach(supporter => {
+    const buildItem = (supporter) => {
       // Check real supportsIds: for nh_ supporter check the event, else check state.people
       let currentSupportsIds = [];
       if (supporter.id.startsWith('nh_')) {
@@ -3757,8 +3797,9 @@ function buildSupportedByUI(personId, team, containerEl, pendingUpdates) {
       roleSpan.textContent = supporter.role + (supporter.id.startsWith('nh_') ? ' · incoming' : '');
       l.appendChild(nameSpan); l.appendChild(roleSpan);
       item.appendChild(cb); item.appendChild(l);
-      section.appendChild(item);
-    });
+      return item;
+    };
+    appendAdvisorsByTeam(section, potentialSupporters, buildItem);
   }
   containerEl.appendChild(section);
 }
@@ -3797,7 +3838,9 @@ function buildPersonSupportsUI(person, containerEl) {
   const supportList = document.createElement('div');
   supportList.style.fontSize = '12px';
 
-  if (!person.team) {
+  // CS staff (CSA/CSC) may support advisors on any team; AFAs stay within their own pod's team.
+  const isCS = ['CSA', 'CSC'].includes(person.role);
+  if (!isCS && !person.team) {
     const warn = document.createElement('div');
     warn.style.cssText = 'color:var(--warning-text);background:var(--warning-bg);border-radius:6px;padding:7px 10px;font-size:12px;';
     warn.textContent = 'Select a team above to see support options.';
@@ -3805,15 +3848,15 @@ function buildPersonSupportsUI(person, containerEl) {
   } else {
     const visiblePeople = getVisiblePeople();
     const advisors = visiblePeople.filter(p =>
-      ['SA', 'LFA', 'FA'].includes(p.role) && p.team === person.team && p.id !== person.id
+      ['SA', 'LFA', 'FA'].includes(p.role) && p.id !== person.id && (isCS || p.team === person.team)
     );
     if (advisors.length === 0) {
       const empty = document.createElement('div');
       empty.style.cssText = 'color:#999;font-size:12px;font-style:italic;padding:4px 0';
-      empty.textContent = 'No SA / LFA / FA found on this team.';
+      empty.textContent = isCS ? 'No SA / LFA / FA found.' : 'No SA / LFA / FA found on this team.';
       supportList.appendChild(empty);
     } else {
-      advisors.forEach(ad => {
+      const buildItem = (ad) => {
         const item = document.createElement('div');
         item.className = 'criteria-item';
         const cb = document.createElement('input');
@@ -3831,8 +3874,10 @@ function buildPersonSupportsUI(person, containerEl) {
         l.textContent = ad.first + ' ' + ad.last + ' (' + ad.role + (ad.id.startsWith('nh_') ? ' · incoming' : '') + ')';
         item.appendChild(cb);
         item.appendChild(l);
-        supportList.appendChild(item);
-      });
+        return item;
+      };
+      if (isCS) appendAdvisorsByTeam(supportList, advisors, buildItem);
+      else advisors.forEach(ad => supportList.appendChild(buildItem(ad)));
     }
   }
   fg.appendChild(supportList);
@@ -3866,7 +3911,9 @@ function buildEventSupportsUI(event, containerEl) {
   const supportList = document.createElement('div');
   supportList.style.fontSize = '12px';
 
-  if (!event.toTeam) {
+  // CS staff (CSA/CSC) may support advisors on any team; AFAs stay within the target team.
+  const isCS = ['CSA', 'CSC'].includes(effectiveRole);
+  if (!isCS && !event.toTeam) {
     const warn = document.createElement('div');
     warn.style.cssText = 'color:var(--warning-text);background:var(--warning-bg);border-radius:6px;padding:7px 10px;font-size:12px;';
     warn.textContent = 'Select a team above to see support options.';
@@ -3877,16 +3924,16 @@ function buildEventSupportsUI(event, containerEl) {
 
   const visiblePeople = getVisiblePeople();
   const advisors = visiblePeople.filter(p =>
-    ['SA', 'LFA', 'FA'].includes(p.role) && p.team === event.toTeam
+    ['SA', 'LFA', 'FA'].includes(p.role) && (isCS || p.team === event.toTeam)
   );
 
   if (advisors.length === 0) {
     const empty = document.createElement('div');
     empty.style.cssText = 'color:#999;font-size:12px;font-style:italic;padding:4px 0';
-    empty.textContent = 'No SA / LFA / FA found on this team.';
+    empty.textContent = isCS ? 'No SA / LFA / FA found.' : 'No SA / LFA / FA found on this team.';
     supportList.appendChild(empty);
   } else {
-    advisors.forEach(ad => {
+    const buildItem = (ad) => {
       const item = document.createElement('div');
       item.className = 'criteria-item';
       const cb = document.createElement('input');
@@ -3906,8 +3953,10 @@ function buildEventSupportsUI(event, containerEl) {
       lbl2.textContent = `${ad.first} ${ad.last} (${ad.role}${ad.id.startsWith('nh_') ? ' · incoming' : ''})`;
       item.appendChild(cb);
       item.appendChild(lbl2);
-      supportList.appendChild(item);
-    });
+      return item;
+    };
+    if (isCS) appendAdvisorsByTeam(supportList, advisors, buildItem);
+    else advisors.forEach(ad => supportList.appendChild(buildItem(ad)));
   }
   containerEl.appendChild(supportList);
 }
